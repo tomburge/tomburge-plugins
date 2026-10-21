@@ -1,0 +1,14 @@
+{
+    "name": "tomburge-plugins",
+    "description": "Plugins made by Tom Burge",
+    "owner": {
+        "name": "Tom Burge"
+    },
+    "plugins": [
+        {
+            "name": "tomdlc",
+            "source": "./plugins/tomdlc",
+            "description": "A plugin for Tom DLC"
+        }
+    ]
+}

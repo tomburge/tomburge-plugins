@@ -1,0 +1,1 @@
+[{"RuleID":"aws-access-token","Description":"AWS key","File":"config.py","StartLine":3,"Secret":"SHOULDNOTPRINT"}]

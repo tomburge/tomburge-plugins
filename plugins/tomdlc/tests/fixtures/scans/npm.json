@@ -1,0 +1,1 @@
+{"auditReportVersion":2,"vulnerabilities":{"lodash":{"name":"lodash","severity":"critical","via":[{"title":"Prototype Pollution","url":"https://github.com/advisories/GHSA-x"}],"range":"<4.17.21","fixAvailable":true},"minimist":{"name":"minimist","severity":"moderate","via":["mkdirp"],"range":"<1.2.6","fixAvailable":{"name":"mkdirp","version":"1.0.4","isSemVerMajor":true}}}}

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Plugin test scratch output
+.testing/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Coverage / build output
+coverage/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp

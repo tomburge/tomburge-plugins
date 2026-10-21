@@ -1,0 +1,8 @@
+{
+  "name": "tomdlc",
+  "private": true,
+  "description": "Development scripts for the TomDLC Claude Code plugin",
+  "scripts": {
+    "test": "bun test"
+  }
+}

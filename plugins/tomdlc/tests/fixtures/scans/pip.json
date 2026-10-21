@@ -1,0 +1,1 @@
+{"dependencies":[{"name":"jinja2","version":"2.11.0","vulns":[{"id":"GHSA-g3rq","fix_versions":["2.11.3"],"description":"Jinja2 ReDoS"}]},{"name":"click","version":"8.1.7","vulns":[]}]}
