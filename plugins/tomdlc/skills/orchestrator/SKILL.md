@@ -1,5 +1,5 @@
 ---
-name: orchestrator
+name: tomdlc
 description: The TomDLC orchestrator, and the single entry point for the secure delivery lifecycle. Use when the user wants to start or continue a project with TomDLC, run any SDLC stage (plan, requirements, design, develop, test, deploy, maintain), make a change (feature, bugfix, security patch, refactor, infra change, incident fix), asks "where are we", "what's next", "threat model this", "set up CI with security scans", "are we ready to release", "handle this incident", or wants SDLC, DevOps, DevSecOps or Secure SDLC work done. Accepts an optional stage name as an argument. Sizes the workflow to the change, dispatches the stage agents, reviews their work, runs the stage gates and keeps docs/sdlc/state.json.
 ---
 
@@ -229,7 +229,7 @@ Projects on a cloud platform deploy through a fixed path: **local → dev → st
 ## Session hygiene
 
 Every turn re-reads the whole conversation, so a session that runs through several stages gets slower and much more expensive with each turn. In a live run, late turns cost about 70 times as much as early ones. Everything you need to continue lives in files, so keep sessions short:
-- **Suggest a fresh session at each gate.** After a stage passes, make sure `resume.nextAction` and `resume.openQuestions` are current. Then tell the user that the next stage can start in a new session with `/tomdlc:orchestrator`; the session-start summary and `state.json` carry everything over. Suggest it again whenever a single stage has run long.
+- **Suggest a fresh session at each gate.** After a stage passes, make sure `resume.nextAction` and `resume.openQuestions` are current. Then tell the user that the next stage can start in a new session with `/tomdlc`; the session-start summary and `state.json` carry everything over. Suggest it again whenever a single stage has run long.
 - **Continue from files, not memory.** In a new session, read `state.json`, the session-start summary, `decisions.md`, and only the sections of stage documents the next step needs. Agent reports are saved in `docs/sdlc/reports/`; read one when you need its detail, rather than keeping it in the conversation.
 - **Keep the conversation lean.** Don't paste whole documents or full agent reports into your messages; summarize what came back in a few lines and point to the file. Read files by section, not whole, when they're long.
 - **Non-interactive runs** (`claude -p`): headless mode stops background agents after 10 minutes. Dispatch agents in the foreground there, or the user must set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`.

@@ -2,6 +2,39 @@
 
 A Claude Code plugin for a secure software delivery lifecycle. It combines the seven standard SDLC stages with DevOps, DevSecOps and Secure SDLC (NIST SSDF) practices, run by a central orchestrator that dispatches specialist agents.
 
+## Quick start
+
+1. Install [Bun](https://bun.sh). Every hook and script runs on it.
+2. Install the plugin (Claude Code 2.1.275 or later):
+
+   ```text
+   /plugin install tomdlc --marketplace tomburge/tomburge-plugins
+   ```
+
+   On earlier versions, add the marketplace first:
+
+   ```text
+   /plugin marketplace add tomburge/tomburge-plugins
+   /plugin install tomdlc@tomburge-plugins
+   ```
+
+3. In your project, run `/tomdlc` and describe what you want to build or change. To jump to a stage, add its name: `/tomdlc design`. If another plugin or command already uses the name `tomdlc`, type `/tomdlc:tomdlc` instead.
+4. The orchestrator proposes a plan (which stages run, at what depth). Approve it in your own words, then answer its questions and approve each stage gate as it comes up. Everything it produces goes into `docs/sdlc/`.
+5. After a gate passes, you can start a fresh session and run `/tomdlc` again. It picks up where you stopped.
+
+## Updating
+
+Refresh the marketplace so Claude Code sees the latest plugin versions, then update the plugin:
+
+```sh
+claude plugin marketplace update tomburge-plugins
+claude plugin update tomdlc@tomburge-plugins
+```
+
+Restart Claude Code to load the new version. If you installed the plugin for a project rather than for your user, add `--scope project` (or `--scope local`) to the update command.
+
+Your project's `docs/sdlc/` files are not touched by an update.
+
 ## How it works
 
 ```
@@ -45,7 +78,7 @@ A Claude Code plugin for a secure software delivery lifecycle. It combines the s
 | 6 | Deploy | platform-engineer (plan review, on AWS) → release-engineer (prepares the release; never deploys) | `06-infra.md`, `06-release.md` |
 | 7 | Maintain | sre (with AWS posture checks) ‖ platform-engineer (drift), with root causes routed back to earlier stage agents | `07-operations.md` |
 
-Start with `/tomdlc:orchestrator`, optionally followed by a stage name, e.g. `/tomdlc:orchestrator design`. The orchestrator also triggers on requests like "fix this bug", "threat model this" or "are we ready to release".
+Start with `/tomdlc`, optionally followed by a stage name, e.g. `/tomdlc design`. If another plugin or command already uses the name `tomdlc`, type `/tomdlc:tomdlc` instead. The orchestrator also triggers on requests like "fix this bug", "threat model this" or "are we ready to release".
 
 ### Sized to the change, scaled to the tier and the project
 - **Scale** (small, medium or large, set in Plan) decides *how much ceremony*: questions per round, review rounds, how low findings are handled (batched, never a reason for another round), document length and gate format. Changes to existing projects are reviewed only where they touch, and findings about untouched parts don't block them. Large projects are split into several changes and batched by area. See `skills/orchestrator/reference/tuning.md`.
@@ -116,7 +149,7 @@ Agents never deploy or apply: the production guard blocks `terraform apply`, `cd
 ## Keeping sessions affordable
 
 Each turn re-reads the whole conversation, so one long session through several stages gets expensive fast. In a full live run, early turns cost under $1 and late ones about $70. TomDLC keeps its state in files, so you don't need a long session:
-- **Start a fresh session per stage.** When a gate passes, open a new session and run `/tomdlc:orchestrator`. The session-start summary (stage, change, slices, next action, open questions, findings, drift) and `docs/sdlc/state.json` carry everything over. The orchestrator suggests this at each gate.
+- **Start a fresh session per stage.** When a gate passes, open a new session and run `/tomdlc`. The session-start summary (stage, change, slices, next action, open questions, findings, drift) and `docs/sdlc/state.json` carry everything over. The orchestrator suggests this at each gate.
 - **Agent reports are files.** Full reports are saved in `docs/sdlc/reports/`, so the conversation only needs summaries.
 - **Headless runs** (`claude -p`): headless mode stops background agents after 10 minutes. Set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` when running the orchestrator non-interactively, and cap each run with `--max-budget-usd`.
 
@@ -124,6 +157,7 @@ Each turn re-reads the whole conversation, so one long session through several s
 
 - **Tests:** `bun test` runs every suite in `tests/suites/`, each driving the hook handlers the way Claude Code does. See `tests/README.md`.
 - **Live runs:** the hooks' tests can't show how agents behave in a real lifecycle, so TomDLC is also checked with headless end-to-end runs on sample projects. `HANDOFF.md` has the method, the results so far and what's still untested.
+- **Releasing:** bump `version` in `.claude-plugin/plugin.json` with every release. Claude Code compares versions to decide whether there is an update, so changes pushed without a bump don't reach installed copies.
 
 ## Install
 

@@ -52,7 +52,7 @@ function context(cwd: string): string | null {
             ". Develop deploys only to dev; stage and prod need a promotion the user approves with the single word \"Approve\".",
         ]
       : []),
-    `Stage outputs live in docs/sdlc/. Continue with /tomdlc:orchestrator, the orchestrator that dispatches the stage agents.`,
+    `Stage outputs live in docs/sdlc/. Continue with /tomdlc, the orchestrator that dispatches the stage agents.`,
   ]
   if (slices.length > 0) lines.push(`Develop slices: ${slices.map((s) => `${s.id}=${s.status}`).join(", ")}.`)
   if (state.baseline) {
@@ -115,7 +115,7 @@ try {
   additionalContext = context(event.cwd ?? process.cwd())
   if (additionalContext) appendAudit(event.cwd ?? process.cwd(), "session_started", "user", { source: event.source })
 } catch (err) {
-  additionalContext = `TomDLC: docs/sdlc/state.json exists but could not be read (${err}). Offer to repair it with /tomdlc:orchestrator.`
+  additionalContext = `TomDLC: docs/sdlc/state.json exists but could not be read (${err}). Offer to repair it with /tomdlc.`
 }
 
 process.stdout.write(

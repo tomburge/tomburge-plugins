@@ -1,11 +1,22 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "tomdlc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A secure software delivery lifecycle: the seven SDLC stages (plan, requirements, design, develop, test, deploy, maintain) with DevOps, DevSecOps and Secure SDLC (NIST SSDF) practices built into every stage, plus stage gates, a threat modeler, a security reviewer and a secrets guard hook.",
   "author": {
     "name": "Tom Burge",
     "email": "tom@tomburge.org"
   },
-  "keywords": ["sdlc", "devops", "devsecops", "secure-sdlc", "ssdf", "threat-modeling", "aws", "terraform", "aws-cdk", "iac"]
+  "keywords": [
+    "sdlc",
+    "devops",
+    "devsecops",
+    "secure-sdlc",
+    "ssdf",
+    "threat-modeling",
+    "aws",
+    "terraform",
+    "aws-cdk",
+    "iac"
+  ]
 }
