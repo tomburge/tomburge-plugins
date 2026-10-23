@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// PreToolUse hook for Write/Edit/MultiEdit on docs/sdlc/state.json. Makes
+// PreToolUse hook for Write/Edit/MultiEdit on .tomdlc/state.json. Makes
 // recorded approvals provable and stops approvals going stale:
 //  1. A stage gate passing (or being re-approved), a new change plan, a
 //     finding the user accepted or rejected, an accepted risk, and a waiver

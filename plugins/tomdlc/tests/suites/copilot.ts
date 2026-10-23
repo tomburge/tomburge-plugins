@@ -7,9 +7,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { H, SP } from "../lib/harness.ts"
 const DIR = join(SP, "projc"), P = DIR.replaceAll("\\", "/")
 rmSync(DIR, { recursive: true, force: true })
-mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
+mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
 mkdirSync(join(DIR, "src"), { recursive: true })
-const AUDIT = join(DIR, "docs/sdlc/audit.jsonl"), STATE = join(DIR, "docs/sdlc/state.json")
+const AUDIT = join(DIR, ".tomdlc/audit.jsonl"), STATE = join(DIR, ".tomdlc/state.json")
 let fails = 0, total = 0
 async function run(hook: string, ev: object) {
   const p = Bun.spawn([process.execPath, join(H, hook)], { stdin: new TextEncoder().encode(JSON.stringify(ev)), stdout: "pipe" })
@@ -36,13 +36,13 @@ expect("secret in Copilot Edit denied", decision(await run("secrets-guard.ts", e
 expect("clean Copilot Write allowed", decision(await run("secrets-guard.ts", write(MAIN, "notes.txt", "hello"))), "allow")
 
 // --- ownership guard reads path
-expect("Copilot Write to the audit log denied", decision(await run("ownership-guard.ts", write(MAIN, "docs/sdlc/audit.jsonl", '{"test":1}'))), "deny")
-expect("Copilot Edit of the audit log denied", decision(await run("ownership-guard.ts", edit(MAIN, "docs/sdlc/audit.jsonl", "a", "b"))), "deny")
-expect("Copilot agent writing state.json denied", decision(await run("ownership-guard.ts", write(SUB, "docs/sdlc/state.json", "{}"))), "deny")
-writeFileSync(join(DIR, "docs/sdlc/.dispatch.json"), JSON.stringify({ agents: { developer: { stage: "develop", owns: ["src/**"] } } }))
+expect("Copilot Write to the audit log denied", decision(await run("ownership-guard.ts", write(MAIN, ".tomdlc/audit.jsonl", '{"test":1}'))), "deny")
+expect("Copilot Edit of the audit log denied", decision(await run("ownership-guard.ts", edit(MAIN, ".tomdlc/audit.jsonl", "a", "b"))), "deny")
+expect("Copilot agent writing state.json denied", decision(await run("ownership-guard.ts", write(SUB, ".tomdlc/state.json", "{}"))), "deny")
+writeFileSync(join(DIR, ".tomdlc/.dispatch.json"), JSON.stringify({ agents: { developer: { stage: "develop", owns: ["src/**"] } } }))
 expect("Copilot agent writing outside its owns denied", decision(await run("ownership-guard.ts", write(SUB, "infra/main.tf", "x"))), "deny")
 expect("Copilot agent writing inside its owns allowed", decision(await run("ownership-guard.ts", write(SUB, "src/app.py", "x = 1\n"))), "allow")
-rmSync(join(DIR, "docs/sdlc/.dispatch.json"))
+rmSync(join(DIR, ".tomdlc/.dispatch.json"))
 
 // --- prompt audit: subagent briefs and write_agent follow-ups are agent messages, never the user's words
 const prompt = (extra: object, text: string) => run("audit-prompt.ts", { hook_event_name: "UserPromptSubmit", session_id: "45ba7182", cwd: DIR, prompt: text, ...extra })
@@ -59,7 +59,7 @@ const base = { project: "demo", codebase: "new", riskTier: "moderate", currentSt
   stages: Object.fromEntries(STAGES.map((s) => [s, { status: "not-started" }])), waivers: [], findings: [], history: [] }
 async function writeState(s: unknown): Promise<string> {
   const content = JSON.stringify(s, null, 2)
-  const d = decision(await run("approval-guard.ts", write(MAIN, "docs/sdlc/state.json", content)))
+  const d = decision(await run("approval-guard.ts", write(MAIN, ".tomdlc/state.json", content)))
   if (d === "allow") {
     writeFileSync(STATE, content)
     await run("audit-events.ts", { ...MAIN, hook_event_name: "PostToolUse", tool_name: "Write", tool_input: { path: STATE, file_text: content } })
@@ -79,7 +79,7 @@ expect("approval from the user's words allowed",
 // --- approval guard applies Copilot Edits to state.json (old_str/new_str) before judging them
 const before = readFileSync(STATE, "utf8")
 expect("invented gate approval via Copilot Edit denied",
-  decision(await run("approval-guard.ts", edit(MAIN, "docs/sdlc/state.json", '"status": "in-progress"',
+  decision(await run("approval-guard.ts", edit(MAIN, ".tomdlc/state.json", '"status": "in-progress"',
     '"status": "passed", "passedAt": "2026-10-21", "approval": { "at": "2026-10-21", "text": "Approved." }'))), "deny")
 expect("state.json untouched by the denied Edit", readFileSync(STATE, "utf8"), before)
 
@@ -104,11 +104,11 @@ expect("bare role outside a TomDLC project allowed", decision(await dispatch({ a
 // --- Copilot reports its PowerShell tool as "Bash": the shell guards parse PowerShell under that name
 const shell = (who: object, command: string) => ({ ...who, tool_name: "Bash", tool_input: { command, description: "x" } })
 expect("PowerShell agent CLI launch under Bash denied", decision(await run("block-claude-cli.ts", shell(MAIN, "Start-Process copilot -ArgumentList '-p','hi'"))), "deny")
-expect("PowerShell state write by agent under Bash denied", decision(await run("ownership-guard.ts", shell(SUB, "Set-Content -Path docs/sdlc/state.json -Value '{}'"))), "deny")
-expect("PowerShell audit-log write under Bash denied", decision(await run("ownership-guard.ts", shell(MAIN, "Add-Content docs/sdlc/audit.jsonl 'x'"))), "deny")
+expect("PowerShell state write by agent under Bash denied", decision(await run("ownership-guard.ts", shell(SUB, "Set-Content -Path .tomdlc/state.json -Value '{}'"))), "deny")
+expect("PowerShell audit-log write under Bash denied", decision(await run("ownership-guard.ts", shell(MAIN, "Add-Content .tomdlc/audit.jsonl 'x'"))), "deny")
 expect("PowerShell production command by agent under Bash denied", decision(await run("prod-guard.ts", shell(SUB, "terraform apply -auto-approve; Write-Output done"))), "deny")
 expect("PowerShell production command by orchestrator under Bash asked", decision(await run("prod-guard.ts", shell(MAIN, "terraform apply -auto-approve"))), "ask")
-expect("PowerShell read-only command under Bash allowed", decision(await run("ownership-guard.ts", shell(SUB, "Get-ChildItem -Path docs/sdlc | Select-Object Name"))), "allow")
+expect("PowerShell read-only command under Bash allowed", decision(await run("ownership-guard.ts", shell(SUB, "Get-ChildItem -Path .tomdlc | Select-Object Name"))), "allow")
 
 console.log(`copilot: ${total - fails}/${total} passed`)
 process.exit(fails ? 1 : 0)

@@ -1,6 +1,6 @@
 # Coding standards
 
-Language-agnostic defaults for new code. `docs/sdlc/practices.md` overrides any of them, and in existing code, the code's own established patterns win (see `changing-existing-code.md`).
+Language-agnostic defaults for new code. `.tomdlc/practices.md` overrides any of them, and in existing code, the code's own established patterns win (see `changing-existing-code.md`).
 
 ## Structure
 - **Organize by feature, not by layer.** `orders/` containing its handler, logic and storage beats `controllers/`, `services/`, `repositories/` spread across the tree. It keeps a change in one place and matches the design's component boundaries.

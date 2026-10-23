@@ -13,7 +13,7 @@ These rules apply to every TomDLC agent. Your own prompt adds the rules for your
 
 ## Writing files
 For agents that write files:
-- Write only the files your brief says you own. Never write `docs/sdlc/state.json`. A hook blocks writes outside the files you own and to the state files.
+- Write only the files your brief says you own. Never write `.tomdlc/state.json`. A hook blocks writes outside the files you own and to the state files.
 - Create and edit files only with the Write and Edit tools, never through shell commands (redirection, `tee`, `sed -i`, or scripts that write files). A hook blocks shell writes outside your files. Build, test and tool output written to its normal location is fine.
 - Never write secrets into files. A secrets guard hook blocks it.
 

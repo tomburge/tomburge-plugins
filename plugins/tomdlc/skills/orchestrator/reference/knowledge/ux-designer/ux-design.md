@@ -1,6 +1,6 @@
 # UX design
 
-The output is a specification the developer can build from and the tester can verify, with low-fidelity wireframes so the user can check layout and priorities before anything is built. It isn't visual design: no colors, fonts or pixel layouts. Write `docs/sdlc/03-ux.md`.
+The output is a specification the developer can build from and the tester can verify, with low-fidelity wireframes so the user can check layout and priorities before anything is built. It isn't visual design: no colors, fonts or pixel layouts. Write `.tomdlc/03-ux.md`.
 
 ## 1. Users and tasks
 From `02-requirements.md`, list the user types and their primary tasks. Each user flow serves a named user type. Don't invent personas the requirements don't support; mark gaps as `ASSUMPTION:`.

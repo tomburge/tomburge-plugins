@@ -22,20 +22,9 @@ an empty section means "use the plugin defaults".
 ## Deployment
 <!-- Release cadence, freeze windows, environments, who approves production releases. -->
 
-## Mandated
-<!-- Tools, libraries or patterns that must be used (e.g. "all HTTP clients use lib/http"). -->
-
-## Forbidden
-<!-- Tools, libraries or patterns that must not be used. -->
-
-## Stage plan presets
-<!-- Named, reusable stage plans the user has approved before, e.g.
-     **dependency-bump** (shape: dependency-update): plan skip, requirements skip, design skip, develop light, test light, deploy light, maintain skip.
-     Not for: major versions or anything touching auth. The orchestrator offers a matching preset when sizing a change. -->
-
-## Learned rules
 <!--
-Corrections the user made that should apply from now on. The orchestrator adds
-these with the user's consent, one per line:
-- YYYY-MM-DD: <rule> (<why>)
+Don't write Mandated, Forbidden, Stage plan presets or Learned rules sections.
+A TomDLC hook appends them below, generated from the `practices` register in
+.tomdlc/state.json, and rewrites them whenever the register changes. Rules
+come from the user; the orchestrator records them in the register.
 -->

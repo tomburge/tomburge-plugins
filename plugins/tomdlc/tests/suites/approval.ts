@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { H, SP } from "../lib/harness.ts"
 const DIR = join(SP, "proj4"), P = DIR.replaceAll("\\", "/")
 rmSync(DIR, { recursive: true, force: true })
-mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
-const AUDIT = join(DIR, "docs/sdlc/audit.jsonl"), STATE = join(DIR, "docs/sdlc/state.json")
+mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
+const AUDIT = join(DIR, ".tomdlc/audit.jsonl"), STATE = join(DIR, ".tomdlc/state.json")
 let fails = 0, total = 0
 async function run(hook: string, ev: object) {
   const p = Bun.spawn([process.execPath, join(H, hook)], { stdin: new TextEncoder().encode(JSON.stringify(ev)), stdout: "pipe" })
@@ -20,11 +20,11 @@ const prompt = (text: string) => run("audit-prompt.ts", { hook_event_name: "User
 /** Guard, then (if allowed) write and run the audit hook, like Claude Code would. */
 async function writeState(s: unknown): Promise<string> {
   const content = JSON.stringify(s, null, 2)
-  const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json`, content } })
+  const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json`, content } })
   const d = g.hookSpecificOutput?.permissionDecision ?? "allow"
   if (d === "allow") {
     writeFileSync(STATE, content)
-    await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+    await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
   }
   lastReason = g.hookSpecificOutput?.permissionDecisionReason ?? ""
   return d
@@ -71,7 +71,7 @@ expect("real change approval allowed", await writeState(state), "allow")
 expect("rejection was audited", events().some((e) => e.event === "approval_rejected"), true)
 
 // --- stage gate approval and its time window
-writeFileSync(join(DIR, "docs/sdlc/01-plan.md"), "# Plan v1\n")
+writeFileSync(join(DIR, ".tomdlc/01-plan.md"), "# Plan v1\n")
 const pass = (st: any, stage: string, text: string, extra: any = {}) =>
   ({ ...st, stages: { ...st.stages, [stage]: { status: "passed", passedAt: "2026-10-12", approval: { at: "2026-10-12", text }, ...extra } } })
 expect("words typed before the gate came up denied", await writeState(pass(state, "plan", "Looks good, go ahead with that plan.")), "deny")
@@ -80,7 +80,7 @@ state = { ...pass(state, "plan", "I approve stage 1, the plan looks good."), cur
 state.stages.requirements = { status: "in-progress" }
 expect("verbatim gate approval allowed", await writeState(state), "allow")
 const fpEvent = events().find((e) => e.event === "stage_fingerprinted")
-expect("plan fingerprinted", Object.keys(fpEvent?.files ?? {}), ["docs/sdlc/01-plan.md"])
+expect("plan fingerprinted", Object.keys(fpEvent?.files ?? {}), [".tomdlc/01-plan.md"])
 
 // --- findings: quoted user words vs paraphrase
 const finding = { id: "F-1", stage: "requirements", source: "reviewer", severity: "high", summary: "x", status: "open" }
@@ -92,22 +92,22 @@ state = { ...state, findings: [{ ...finding, status: "accepted", decision: 'User
 expect("quoted decision allowed", await writeState(state), "allow")
 
 // --- requirements gate
-writeFileSync(join(DIR, "docs/sdlc/02-requirements.md"), "# Requirements v1\n")
+writeFileSync(join(DIR, ".tomdlc/02-requirements.md"), "# Requirements v1\n")
 await prompt("Requirements approved.")
 state = { ...pass(state, "requirements", "Requirements approved."), currentStage: "design" }
 state.stages.design = { status: "in-progress" }
 expect("requirements pass", await writeState(state), "allow")
 
 // --- drift: an approved document changes
-const ctx = await writeDoc("docs/sdlc/01-plan.md", "# Plan v2, edited after approval\n")
+const ctx = await writeDoc(".tomdlc/01-plan.md", "# Plan v2, edited after approval\n")
 expect("edit reported to Claude", String(ctx.hookSpecificOutput?.additionalContext ?? "").includes("was approved at the plan gate"), true)
 expect("edit audited", events().at(-1)?.event, "approved_document_changed")
 const beforeSecondEdit = events().filter((e) => e.event === "approved_document_changed").length
-const ctx2 = await writeDoc("docs/sdlc/01-plan.md", "# Plan v3, edited again\n")
+const ctx2 = await writeDoc(".tomdlc/01-plan.md", "# Plan v3, edited again\n")
 expect("second edit not logged again", events().filter((e) => e.event === "approved_document_changed").length, beforeSecondEdit)
 expect("second edit still reported to Claude", String(ctx2.hookSpecificOutput?.additionalContext ?? "").includes("was approved at the plan gate"), true)
-expect("session start lists drift", (await sessionStart()).includes("Approved documents changed since their gate: docs/sdlc/01-plan.md (plan"), true)
-writeFileSync(join(DIR, "docs/sdlc/03-design.md"), "# Design\n")
+expect("session start lists drift", (await sessionStart()).includes("Approved documents changed since their gate: .tomdlc/01-plan.md (plan"), true)
+writeFileSync(join(DIR, ".tomdlc/03-design.md"), "# Design\n")
 await prompt("Design approved.")
 expect("next gate blocked by drift", await writeState(pass(state, "design", "Design approved.")), "deny")
 expect("reason asks for re-approval", lastReason.includes("01-plan.md changed after the plan gate"), true)
@@ -134,10 +134,10 @@ state.stages.design.approval = { at: "2026-10-15", text: "Contract change is fin
 expect("re-approve contract", await writeState(state), "allow")
 
 // --- review drift
-writeFileSync(join(DIR, "docs/sdlc/04-develop.md"), "# Develop v1\n")
+writeFileSync(join(DIR, ".tomdlc/04-develop.md"), "# Develop v1\n")
 await run("audit-events.ts", { hook_event_name: "SubagentStop", cwd: P, agent_id: "r1", agent_type: "tomdlc:reviewer", last_assistant_message: "### Summary\nREADY: 0 critical, 1 high\n### Findings\n" })
 expect("review fingerprinted", events().at(-1)?.event, "review_fingerprinted")
-await writeDoc("docs/sdlc/04-develop.md", "# Develop v2 after review\n")
+await writeDoc(".tomdlc/04-develop.md", "# Develop v2 after review\n")
 expect("review drift audited", events().at(-1)?.event, "reviewed_document_changed")
 await prompt("Develop approved.")
 expect("high tier: review drift blocks", await writeState({ ...pass(state, "develop", "Develop approved."), riskTier: "high" }), "deny")
@@ -164,14 +164,14 @@ expect("the user's own words can", await writeState(pass(state, "test", "Testing
 
 // --- a new project whose state is created together with its first change: the change is proposed then
 {
-  const D2 = join(SP, "proj-newchange"); mkdirSync(join(D2, "docs/sdlc"), { recursive: true })
-  const P2 = D2.replaceAll("\\", "/"), S2 = join(D2, "docs/sdlc/state.json")
-  const ev2 = () => readFileSync(join(D2, "docs/sdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+  const D2 = join(SP, "proj-newchange"); mkdirSync(join(D2, ".tomdlc"), { recursive: true })
+  const P2 = D2.replaceAll("\\", "/"), S2 = join(D2, ".tomdlc/state.json")
+  const ev2 = () => readFileSync(join(D2, ".tomdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
   const write2 = async (s: unknown) => {
     const content = JSON.stringify(s, null, 2)
-    const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P2, tool_name: "Write", tool_input: { file_path: `${P2}/docs/sdlc/state.json`, content } })
+    const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P2, tool_name: "Write", tool_input: { file_path: `${P2}/.tomdlc/state.json`, content } })
     const d = g.hookSpecificOutput?.permissionDecision ?? "allow"
-    if (d === "allow") { writeFileSync(S2, content); await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P2, tool_name: "Write", tool_input: { file_path: `${P2}/docs/sdlc/state.json` } }) }
+    if (d === "allow") { writeFileSync(S2, content); await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P2, tool_name: "Write", tool_input: { file_path: `${P2}/.tomdlc/state.json` } }) }
     return d
   }
   await run("audit-prompt.ts", { hook_event_name: "UserPromptSubmit", cwd: P2, prompt: "New project: a tiny app. Propose the plan and stop." })
@@ -188,14 +188,14 @@ expect("the user's own words can", await writeState(pass(state, "test", "Testing
 {
   const legacy = { ...state, change: { ...state.change, id: "CH-7", approval: { at: "2026-10-12", text: 'User: "use sensible defaults."' } } }
   writeFileSync(STATE, JSON.stringify(legacy, null, 2)) // as an older plugin version would have left it
-  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
   expect("legacy change logged as approved", events().at(-1)?.event === "change_approved" || events().some((e) => e.event === "change_approved" && e.id === "CH-7"), true)
   const reapprove = (text: string) => writeState({ ...legacy, change: { ...legacy.change, approval: { at: "2026-10-12", text } } })
   expect("legacy re-approval with invented words denied", await reapprove("CH-7 plan approved."), "deny")
   await prompt("I re-approve the CH-7 stage plan as shown.")
   expect("legacy re-approval with the user's later words allowed", await reapprove('User: "I re-approve the CH-7 stage plan as shown."'), "allow")
   writeFileSync(STATE, JSON.stringify(state, null, 2))
-  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 }
 
 // --- lightening the active change's plan needs the user's words; escalating doesn't
@@ -215,9 +215,9 @@ await writeState(state)
 // --- approval words must postdate the last change to the stage's documents
 state.stages.deploy = { status: "in-progress" }
 expect("deploy started", await writeState(state), "allow")
-await writeDoc("docs/sdlc/06-release.md", "# Release v1\n")
+await writeDoc(".tomdlc/06-release.md", "# Release v1\n")
 await prompt("Fix the rollback typo in 06-release.md, then Deploy approved.")
-await writeDoc("docs/sdlc/06-release.md", "# Release v2, typo fixed\n")
+await writeDoc(".tomdlc/06-release.md", "# Release v2, typo fixed\n")
 const conditionalPass = (st: any, extra: any) => ({ ...st, stages: { ...st.stages, deploy: { status: "passed", passedAt: "2026-10-12", approval: { at: "2026-10-12", text: "Deploy approved.", ...extra } } } })
 expect("approval before the last edit denied", await writeState(pass(state, "deploy", "Deploy approved.")), "deny")
 expect("reason offers a conditional approval", lastReason.includes("conditional"), true)

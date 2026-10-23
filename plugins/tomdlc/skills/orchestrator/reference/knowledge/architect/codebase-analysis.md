@@ -1,6 +1,6 @@
 # Codebase analysis
 
-For an existing codebase, every later stage depends on an accurate picture of what's actually there. This method produces `docs/sdlc/00-codebase.md`: an as-is description, not a design proposal. Describe what you observe; mark anything inferred as such.
+For an existing codebase, every later stage depends on an accurate picture of what's actually there. This method produces `.tomdlc/00-codebase.md`: an as-is description, not a design proposal. Describe what you observe; mark anything inferred as such.
 
 ## Method
 

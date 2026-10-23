@@ -15,10 +15,10 @@ The shared TomDLC agent rules are added at the start of your context; follow the
 Your brief sets the mode: **design** (the default), **codebase analysis**, **light** or **update**.
 
 ### Codebase analysis mode
-For an existing codebase, before any design work. Follow the codebase analysis method in your reference files and write `docs/sdlc/00-codebase.md`, an as-is description of what's there, not a proposal. Don't write `03-design.md` in this mode. Report the test command you found, the coupling hotspots, and any area with weak test coverage relative to its risk under **Findings**, since they affect how the orchestrator sizes changes.
+For an existing codebase, before any design work. Follow the codebase analysis method in your reference files and write `.tomdlc/00-codebase.md`, an as-is description of what's there, not a proposal. Don't write `03-design.md` in this mode. Report the test command you found, the coupling hotspots, and any area with weak test coverage relative to its risk under **Findings**, since they affect how the orchestrator sizes changes.
 
 ### Design mode
-Read `02-requirements.md` and the risk tier. If code exists, read `00-codebase.md` and the code it points to, so the design describes reality and builds on what's there. Write `docs/sdlc/03-design.md`, with diagrams as Mermaid.
+Read `02-requirements.md` and the risk tier. If code exists, read `00-codebase.md` and the code it points to, so the design describes reality and builds on what's there. Write `.tomdlc/03-design.md`, with diagrams as Mermaid.
 
 **SDLC: architecture**
 - Context: the system, its users and its external dependencies

@@ -20,16 +20,16 @@ const fwd = (p: string) => p.replaceAll("\\", "/")
 // A main checkout with TomDLC state, and a linked worktree laid out the way git does it.
 const MAIN = join(SP, "main"), WT = join(SP, "wt-s2")
 mkdirSync(join(MAIN, ".git", "worktrees", "wt-s2"), { recursive: true })
-mkdirSync(join(MAIN, "docs", "sdlc"), { recursive: true })
+mkdirSync(join(MAIN, ".tomdlc"), { recursive: true })
 mkdirSync(join(WT, "src", "b"), { recursive: true })
 writeFileSync(join(WT, ".git"), `gitdir: ${fwd(join(MAIN, ".git", "worktrees", "wt-s2"))}\n`)
-writeFileSync(join(MAIN, "docs/sdlc/.dispatch.json"), JSON.stringify({
+writeFileSync(join(MAIN, ".tomdlc/.dispatch.json"), JSON.stringify({
   agents: {
     "developer#S-2": { stage: "develop", owns: ["src/b/**"] },
     "developer#S-3": { stage: "develop", owns: ["src/c/**"] },
   },
 }))
-writeFileSync(join(MAIN, "docs/sdlc/state.json"), JSON.stringify({ project: "demo", currentStage: "develop" }))
+writeFileSync(join(MAIN, ".tomdlc/state.json"), JSON.stringify({ project: "demo", currentStage: "develop" }))
 
 // Transcripts: the main session's, and each agent's brief as the first message of its own transcript.
 const TRANSCRIPTS = join(SP, "transcripts")
@@ -64,18 +64,18 @@ expect("a key for another agent type is ignored (blocked)", await og(agentEv("sp
 
 // --- the worktree resolves to the main checkout's state
 expect("state file in the worktree copy is still protected",
-  await og(agentEv("dev2", WT, join(WT, "docs/sdlc/state.json"))), "deny")
+  await og(agentEv("dev2", WT, join(WT, ".tomdlc/state.json"))), "deny")
 expect("writes outside both trees are allowed", await og(agentEv("dev2", WT, join(SP, "elsewhere.txt"))), "allow")
 
 // --- audit from a worktree lands in the main checkout's log
 writeFileSync(join(WT, "src/b/x.py"), "x = 1\n")
 await run("audit-events.ts", { ...agentEv("dev2", WT, join(WT, "src/b/x.py")), hook_event_name: "PostToolUse" })
-const audit = join(MAIN, "docs/sdlc/audit.jsonl")
+const audit = join(MAIN, ".tomdlc/audit.jsonl")
 const last = existsSync(audit) ? JSON.parse(readFileSync(audit, "utf8").trim().split("\n").at(-1)!) : {}
 expect("artifact logged in the main log", last.event, "artifact_written")
 expect("path relative to the worktree", last.file, "src/b/x.py")
 expect("worktree recorded", fwd(String(last.worktree ?? "")).endsWith("wt-s2"), true)
-expect("no audit log forked into the worktree", existsSync(join(WT, "docs/sdlc/audit.jsonl")), false)
+expect("no audit log forked into the worktree", existsSync(join(WT, ".tomdlc/audit.jsonl")), false)
 const auditLines = () => readFileSync(audit, "utf8").trim().split("\n").map((l) => JSON.parse(l))
 expect("first write binds the instance key", auditLines().filter((e) => e.event === "agent_instance").map((e) => [e.agentId, e.key]), [["dev2", "developer#S-2"]])
 await run("audit-events.ts", { ...agentEv("dev2", WT, join(WT, "src/b/x.py")), hook_event_name: "PostToolUse" })
@@ -99,12 +99,12 @@ const stop = () => run("audit-events.ts", { hook_event_name: "SubagentStop", cwd
 await stop()
 await Bun.sleep(1100)
 await stop()
-expect("two stops, two report files", readdirSync(join(MAIN, "docs/sdlc/reports"), { recursive: true }).filter((f) => String(f).includes("dev2aaaa")).length, 2)
+expect("two stops, two report files", readdirSync(join(MAIN, ".tomdlc/reports"), { recursive: true }).filter((f) => String(f).includes("dev2aaaa")).length, 2)
 
 // --- dispatch keys are validated
 const vd = (agents: object) => {
-  writeFileSync(join(MAIN, "docs/sdlc/.dispatch.json"), JSON.stringify({ agents }))
-  return run("validate-state.ts", { cwd: fwd(MAIN), tool_name: "Write", tool_input: { file_path: fwd(join(MAIN, "docs/sdlc/.dispatch.json")) } }).then(dec)
+  writeFileSync(join(MAIN, ".tomdlc/.dispatch.json"), JSON.stringify({ agents }))
+  return run("validate-state.ts", { cwd: fwd(MAIN), tool_name: "Write", tool_input: { file_path: fwd(join(MAIN, ".tomdlc/.dispatch.json")) } }).then(dec)
 }
 expect("instance keys valid", await vd({ "developer#S-2": { stage: "develop", owns: ["src/b/**"] } }), "allow")
 expect("bad key rejected", await vd({ "Developer S2": { stage: "develop", owns: ["src/b/**"] } }), "block")

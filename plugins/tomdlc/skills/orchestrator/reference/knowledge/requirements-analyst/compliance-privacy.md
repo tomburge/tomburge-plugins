@@ -80,7 +80,7 @@ Compliance isn't settled at Requirements. Each compliance-derived SR is carried 
 | Maintain | sre | An evidence schedule in `07-operations.md` (control, evidence, frequency, last collected, next due); collected on schedule; gaps raised as findings or risks |
 
 ### Audit-readiness package
-At the moderate and high tiers with an audit in view, keep these current in `docs/sdlc/` so an audit doesn't start from scratch:
+At the moderate and high tiers with an audit in view, keep these current in `.tomdlc/` so an audit doesn't start from scratch:
 - the control matrix: framework control → SR → design element → evidence → owner
 - the evidence index from `07-operations.md`
 - the risk register (accepted risks with the user's decisions) and open waivers

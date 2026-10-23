@@ -3,7 +3,7 @@
 How the developer writes the tests that ship with each slice. The tester adds integration, end-to-end, performance and accessibility tests later; your tests prove each unit behaves as the requirements and functional design say.
 
 ## Testing approach
-Follow the **Testing approach** in `docs/sdlc/practices.md`:
+Follow the **Testing approach** in `.tomdlc/practices.md`:
 - **Test-first or TDD:** write a failing test, make it pass, then refactor. Report evidence in your result: the test name and that it failed before the change.
 - **Test-after** (the default if practices are silent): write the tests in the same slice as the code, never "later".
 - **Bug fixes, always:** first write a test that reproduces the bug and fails, then fix it. This is the regression test.

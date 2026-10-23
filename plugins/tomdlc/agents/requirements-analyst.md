@@ -13,7 +13,7 @@ The shared TomDLC agent rules are added at the start of your context; follow the
 - You can search the web and fetch public pages, following the shared web research rules.
 
 ## Work
-Read `docs/sdlc/01-plan.md`, especially the risk tier, data classification and compliance drivers, and `docs/sdlc/00-codebase.md` if it exists. Write `docs/sdlc/02-requirements.md`.
+Read `.tomdlc/01-plan.md`, especially the risk tier, data classification and compliance drivers, and `.tomdlc/00-codebase.md` if it exists. Write `.tomdlc/02-requirements.md`.
 
 Give every requirement an ID, a one-line statement, a MoSCoW priority, and acceptance criteria a test can check ("p95 < 300 ms at 200 rps", not "fast").
 
@@ -54,7 +54,7 @@ Give every requirement an ID, a one-line statement, a MoSCoW priority, and accep
 - **Edge-case sweep:** follow the edge-case method in your reference files, at the depth for your tier, plus any project conditions in your standards files. Settle every condition that applies as an acceptance criterion or requirement, an `ASSUMPTION:` with a reason, or an explicit out-of-scope entry. Record the sweep as an **Edge cases** table. Abuse cases cover deliberate attacks; this covers everything else.
 - **Traceability matrix:** requirement ID → source (objective, stakeholder, ASVS ID or compliance driver) → verification method (unit, integration, DAST, manual or review) → for compliance-derived SRs, the **evidence** source, owner and frequency
 
-**Questions mode** (when the brief asks for it): don't write any file. Read the request, `01-plan.md`, `00-codebase.md` and `docs/sdlc/decisions.md` where they exist, and return under **Questions for the user** only what you can't reasonably decide yourself, at most about 10, grouped by topic. For each one, give why it matters (what it changes in the document) and a proposed default the user can simply accept. Use the question guidance in your reference files. List the defaults you'd apply without asking under **Summary**, so the user can see them.
+**Questions mode** (when the brief asks for it): don't write any file. Read the request, `01-plan.md`, `00-codebase.md` and `.tomdlc/decisions.md` where they exist, and return under **Questions for the user** only what you can't reasonably decide yourself, at most about 10, grouped by topic. For each one, give why it matters (what it changes in the document) and a proposed default the user can simply accept. Use the question guidance in your reference files. List the defaults you'd apply without asking under **Summary**, so the user can see them.
 
 **Light mode** (when the brief's stage action is `light`): change only what the change needs. For example, confirm or correct the requirement a bug violates and add the missing acceptance criterion. Sweep edge cases only for the flows the change touches. Keep existing IDs and add new ones after the highest existing number.
 

@@ -14,8 +14,8 @@ function expect(name: string, got: unknown, want: unknown) {
   if (JSON.stringify(got) !== JSON.stringify(want)) { fails++; console.log(`FAIL ${name}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`) }
 }
 const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"]
-const STATE = join(SP, "proj2/docs/sdlc/state.json"), DISPATCH = join(SP, "proj2/docs/sdlc/.dispatch.json")
-const vs = async (s: unknown) => { writeFileSync(STATE, JSON.stringify(s)); return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } }) }
+const STATE = join(SP, "proj2/.tomdlc/state.json"), DISPATCH = join(SP, "proj2/.tomdlc/.dispatch.json")
+const vs = async (s: unknown) => { writeFileSync(STATE, JSON.stringify(s)); return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } }) }
 const dec = (o: any) => o.decision ?? o.hookSpecificOutput?.permissionDecision ?? "allow"
 
 const base = {
@@ -93,16 +93,16 @@ const shellCases: [string, string, string?][] = [
   ["echo $X > $OUT", "allow"],
   ["cat > infra/x.tf <<'EOF'\nresource {}\nEOF", "deny"],
   ["bash -c 'echo hi > infra/y.tf'", "deny"],
-  ["echo '{}' > docs/sdlc/state.json", "deny"],
+  ["echo '{}' > .tomdlc/state.json", "deny"],
   ["git status", "allow"],
 ]
 for (const [cmd, want] of shellCases) expect(`shell: ${cmd.split("\n")[0]}`, await sh(cmd), want)
 expect("pwsh Set-Content outside", await sh("Set-Content -Path infra\\x.tf -Value 'a'", AG, "PowerShell"), "deny")
 expect("pwsh Out-File owned", await sh("'a' | Out-File src\\a.txt", AG, "PowerShell"), "allow")
 expect("pwsh Copy-Item dest outside", await sh("Copy-Item src\\a.ts -Destination infra\\a.ts", AG, "PowerShell"), "deny")
-expect("pwsh state file", await sh("Set-Content docs\\sdlc\\state.json '{}'", AG, "PowerShell"), "deny")
+expect("pwsh state file", await sh("Set-Content .tomdlc\\state.json '{}'", AG, "PowerShell"), "deny")
 expect("agent without entry: free", await sh("echo hi > .github/ci.yml", { ...AG, agent_type: "tomdlc:tester" }), "allow")
-expect("agent without entry: state still blocked", await sh("echo hi > docs/sdlc/.dispatch.json", { ...AG, agent_type: "tomdlc:tester" }), "deny")
+expect("agent without entry: state still blocked", await sh("echo hi > .tomdlc/.dispatch.json", { ...AG, agent_type: "tomdlc:tester" }), "deny")
 expect("main session: free", await sh("echo hi > .github/ci.yml", { cwd: P }), "allow")
 expect("outside project: free", await sh(`echo hi > ${SP.replaceAll("\\", "/")}/elsewhere.txt`), "allow")
 rmSync(DISPATCH)

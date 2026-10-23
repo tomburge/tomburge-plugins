@@ -61,16 +61,16 @@ for (const [cmd, m, a] of prod) {
 
 // ---- #2 / #6 ownership-guard
 const og = (ev: object, tool: string, input: object) => run("ownership-guard.ts", { ...ev, tool_name: tool, tool_input: input })
-expect("main writes state", decision(await og(MAIN, "Write", { file_path: `${P}/docs/sdlc/state.json` })), "allow")
-expect("agent writes state", decision(await og(AG, "Write", { file_path: `${P}/docs/sdlc/state.json` })), "deny")
-expect("agent edits STATE case", decision(await og(AG, "Edit", { file_path: `${P}/DOCS/SDLC/State.json` })), "deny")
-expect("generic agent writes dispatch", decision(await og({ ...AG, agent_type: "general-purpose" }, "Write", { file_path: `${P}/docs/sdlc/.dispatch.json` })), "deny")
-expect("agent bash writes state", decision(await og(AG, "Bash", { command: "echo '{}' > docs/sdlc/state.json" })), "deny")
-expect("agent pwsh writes state", decision(await og(AG, "PowerShell", { command: "Set-Content docs\\sdlc\\state.json '{}'" })), "deny")
-expect("agent bash reads state", decision(await og(AG, "Bash", { command: "cat docs/sdlc/state.json" })), "allow")
+expect("main writes state", decision(await og(MAIN, "Write", { file_path: `${P}/.tomdlc/state.json` })), "allow")
+expect("agent writes state", decision(await og(AG, "Write", { file_path: `${P}/.tomdlc/state.json` })), "deny")
+expect("agent edits STATE case", decision(await og(AG, "Edit", { file_path: `${P}/.TOMDLC/State.json` })), "deny")
+expect("generic agent writes dispatch", decision(await og({ ...AG, agent_type: "general-purpose" }, "Write", { file_path: `${P}/.tomdlc/.dispatch.json` })), "deny")
+expect("agent bash writes state", decision(await og(AG, "Bash", { command: "echo '{}' > .tomdlc/state.json" })), "deny")
+expect("agent pwsh writes state", decision(await og(AG, "PowerShell", { command: "Set-Content .tomdlc\\state.json '{}'" })), "deny")
+expect("agent bash reads state", decision(await og(AG, "Bash", { command: "cat .tomdlc/state.json" })), "allow")
 expect("agent bash tf state", decision(await og(AG, "Bash", { command: "cp infra/state.json backup/" })), "allow")
 expect("agent no dispatch -> free", decision(await og(AG, "Write", { file_path: `${P}/infra/main.tf` })), "allow")
-writeFileSync(join(SP, "proj2/docs/sdlc/.dispatch.json"), JSON.stringify({ agents: { developer: { stage: "develop", owns: ["src/**", "tests/unit/**", "package.json"] } } }))
+writeFileSync(join(SP, "proj2/.tomdlc/.dispatch.json"), JSON.stringify({ agents: { developer: { stage: "develop", owns: ["src/**", "tests/unit/**", "package.json"] } } }))
 expect("owned file", decision(await og(AG, "Write", { file_path: `${P}/src/api/users.ts` })), "allow")
 expect("owned exact", decision(await og(AG, "Edit", { file_path: `${P}/package.json` })), "allow")
 expect("owned windows path", decision(await og(AG, "Edit", { file_path: `${P.replaceAll("/", "\\")}\\tests\\unit\\a.test.ts` })), "allow")
@@ -103,16 +103,16 @@ const good = {
   waivers: [{ stage: "requirements", criterion: "Stakeholder review", reason: "PO on leave", owner: "tom", expires: "2026-11-01" }],
   history: [{ date: "2026-10-01", stage: "plan", agent: "planner", outcome: "passed" }],
 }
-expect("state valid", decision(await vs("docs/sdlc/state.json", good)), "allow")
-const bad = await vs("docs/sdlc/state.json", { ...good, currentStage: "build", stages: { ...good.stages, plan: { status: "done" }, design: { status: "passed" } }, waivers: [{ stage: "plan", criterion: "x" }] })
+expect("state valid", decision(await vs(".tomdlc/state.json", good)), "allow")
+const bad = await vs(".tomdlc/state.json", { ...good, currentStage: "build", stages: { ...good.stages, plan: { status: "done" }, design: { status: "passed" } }, waivers: [{ stage: "plan", criterion: "x" }] })
 expect("state invalid", decision(bad), "block")
 for (const frag of ["currentStage", "stages.plan.status", "stages.design` is passed but has no ISO", "waivers[0].owner", "waivers[0].expires", "requirements` is passed-with-waivers"])
   expect(`state error mentions ${frag}`, bad.reason?.includes(frag), true)
-expect("state not json", decision(await vs("docs/sdlc/state.json", "{ nope")), "block")
-expect("dispatch valid", decision(await vs("docs/sdlc/.dispatch.json", { agents: { developer: { stage: "develop", owns: ["src/**"] } } })), "allow")
-expect("dispatch invalid", decision(await vs("docs/sdlc/.dispatch.json", { agents: { developer: { stage: "dev", owns: ["C:\\src\\**"] } } })), "block")
+expect("state not json", decision(await vs(".tomdlc/state.json", "{ nope")), "block")
+expect("dispatch valid", decision(await vs(".tomdlc/.dispatch.json", { agents: { developer: { stage: "develop", owns: ["src/**"] } } })), "allow")
+expect("dispatch invalid", decision(await vs(".tomdlc/.dispatch.json", { agents: { developer: { stage: "dev", owns: ["C:\\src\\**"] } } })), "block")
 expect("other file ignored", decision(await vs("README.md", "# hi")), "allow")
-rmSync(join(SP, "proj2/docs/sdlc/.dispatch.json"))
+rmSync(join(SP, "proj2/.tomdlc/.dispatch.json"))
 
 // ---- #4 post-write-scan
 const ps = (file: string, env = {}) => run("post-write-scan.ts", { ...MAIN, tool_name: "Write", tool_input: { file_path: `${P}/${file}` } }, env)
@@ -125,7 +125,7 @@ expect("scan reports gitleaks", ctx.includes("gitleaks generic-api-key at line 2
 expect("scan hides secret", ctx.includes("SHOULD-NOT-APPEAR"), false)
 const md: string = (await ps("README.md", PATHX)).hookSpecificOutput?.additionalContext ?? ""
 expect("scan md gitleaks only", md.includes("gitleaks") && !md.includes("semgrep"), true)
-expect("scan skips docs/sdlc", await ps("docs/sdlc/state.json", PATHX), {})
+expect("scan skips .tomdlc", await ps(".tomdlc/state.json", PATHX), {})
 
 // --- guards fail closed: a broken guard denies instead of silently allowing
 {

@@ -1,11 +1,15 @@
 # TomDLC handoff
 
-Where TomDLC stands as of 2026-10-21, how it's been checked, and what to do next. `README.md` describes what the plugin does; this file is for whoever develops it next.
+Where TomDLC stands as of 2026-10-23, how it's been checked, and what to do next. `README.md` describes what the plugin does; this file is for whoever develops it next.
 
 ## State
-- **Branch:** `main`, nothing pushed (no remote). The latest work is the run 1 and run 3 fixes (`b3f84c8`, `8f46996`).
-- **Tests:** `bun test` passes all 10 suites. Run it after every change; `tests/README.md` lists what each suite covers.
-- **Layout:** `skills/orchestrator/SKILL.md` is the orchestrator. `agents/*.md` are the 14 stage agents. `hooks/hooks.json` wires the Bun handlers in `hooks-handlers/` (shared code in `hooks-handlers/lib/`). Method detail lives in `skills/orchestrator/reference/` (gates, tuning, change shapes, control map) and `reference/knowledge/<agent>/` (`knowledge/README.md` says which file goes to which agent). `scripts/` has the traceability checker and the scanner-report importer.
+- **Repository:** the plugin lives in the `tomburge-plugins` marketplace repo (`github.com/tomburge/tomburge-plugins`) under `plugins/tomdlc/`, on `main`. Earlier history (the run 1 and run 3 fixes) is in the old standalone repo; this one starts at its `initial` commit.
+- **Version 0.2.0** (not yet committed) has two changes since 0.1.3:
+  - **Project files moved from `docs/sdlc/` to `.tomdlc/`,** so TomDLC's files don't mix with a project's own documentation. `scripts/move-to-tomdlc.ts` migrates an older project: it moves the folder and rewrites the paths the audit snapshot (fingerprints, archive segments), `state.json` stage `outputs` and `.gitignore` record, so approvals and the audit chain stay valid. Session start detects a `docs/sdlc/state.json` and asks the orchestrator to offer the move; until it's done, the hooks treat the project as non-TomDLC.
+  - **Registers have markdown views.** `state.json` stays the source of truth. The new `sync-registers` hook regenerates `risks.md`, `findings.md`, `waivers.md`, `spikes.md`, `promotions.md` and `decisions.md` after every `state.json` write (`hooks-handlers/lib/registers.ts`), and the ownership guard blocks everyone from writing them. Two new registers back what used to be prose: `decisions` (`D-n`, the user's answers verbatim) and `practices` (`RULE-n`: mandated, forbidden, preset, learned). `practices.md` keeps the planner's prose; only its rule sections are generated, between markers. A `decisions.md` or `practices.md` written before its register is kept until the orchestrator migrates the entries.
+- **Tests:** `bun test` passes all 12 suites (new: `registers`; the migration is in `lifecycle`). Run it after every change; `tests/README.md` lists what each suite covers.
+- **Layout:** `skills/orchestrator/SKILL.md` is the orchestrator. `agents/*.md` are the 14 stage agents. `hooks/hooks.json` wires the Bun handlers in `hooks-handlers/` (shared code in `hooks-handlers/lib/`). Method detail lives in `skills/orchestrator/reference/` (gates, tuning, change shapes, control map) and `reference/knowledge/<agent>/` (`knowledge/README.md` says which file goes to which agent). `scripts/` has the traceability checker, the scanner-report importer and the `docs/sdlc` → `.tomdlc` migration.
+- **The plugin's own hooks run while you develop it** if it's installed in your Claude Code. The ownership guard then blocks shell commands in this repo that mention TomDLC state paths and look like writes, e.g. a `python` or `sed -i` rewrite of source files that contain `.tomdlc/state.json`. Make those edits with the Edit tool.
 
 ## How changes are made
 - **Prompt changes are tested by live runs; hook changes by the suites.** A rule in `SKILL.md` or an agent file only proves itself when an orchestrator follows it in a real run. A hook change needs a suite test first.
@@ -23,7 +27,7 @@ Headless sessions drive TomDLC on a sample project, one fresh session per stage.
 cd "$1" || exit 1
 NOAWS=$(cd /c/tmp/tomdlc-wt/noaws && pwd -W)   # noaws/ holds empty `config` and `credentials` files
 env -u AWS_SDK_LOAD_CONFIG -u AWS_PROFILE AWS_CONFIG_FILE="$NOAWS/config" AWS_SHARED_CREDENTIALS_FILE="$NOAWS/credentials" AWS_EC2_METADATA_DISABLED=true \
-  CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p "$4" --plugin-dir C:/repos/tom/tomdlc --permission-mode auto --max-budget-usd "$3" --output-format json > "../$2.json" 2> "../$2.err"
+  CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p "$4" --plugin-dir C:/repos/tom/claude/tomburge-plugins/plugins/tomdlc --permission-mode auto --max-budget-usd "$3" --output-format json > "../$2.json" 2> "../$2.err"
 python -X utf8 -c "import json;d=json.load(open('../$2.json',encoding='utf-8'));print('== $2 cost',round(d.get('total_cost_usd',0),2),'min',round(d.get('duration_ms',0)/60000,1));print(d.get('result'))" 2>&1 || tail -5 "../$2.err"
 ```
 `emptyhome/` is an empty folder to point `HOME` and `USERPROFILE` at for credential-free builds.
@@ -35,6 +39,7 @@ python -X utf8 -c "import json;d=json.load(open('../$2.json',encoding='utf-8'));
 - **Agree a budget and pause at it.** Report spend after every session. Costs below are what runs actually cost, not estimates.
 - **Before resuming after an interruption,** check for a still-running `claude -p` process: one survived an editor restart, kept writing state and finished its reviews.
 - Put sample projects under `C:\tmp\tomdlc-wt\`, not the scratchpad: git worktrees fail under the scratchpad's path.
+- Sample projects kept from runs before 0.2.0 still use `docs/sdlc/`. Migrate them (or let the orchestrator offer it) before reusing them.
 
 **Windows notes:** use `python -X utf8`; set `MSYS_NO_PATHCONV=1` for AWS CLI paths in Git Bash; quote comma lists in PowerShell. Claude Code's auto mode refuses production changes (security services, `cdk deploy`) until the user explicitly authorizes that action in the conversation.
 
@@ -49,13 +54,19 @@ python -X utf8 -c "import json;d=json.load(open('../$2.json',encoding='utf-8'));
 | Run 3, 2026-10-19..20 | payledger (existing code, high, small) | Orientation on code TomDLC hadn't seen (it found both planted defects plus a real one), high-tier gates, a mid-change re-scope, an incident routed to an incident-fix proposal | ~$132 |
 | Run 4, 2026-10-20 | orderfeed (existing deployed service, moderate) | An incident-fix change end to end: sre triage, fix, test against a copy of production, rehearsal, deploy, verified export, postmortem routed to five stages | ~$18, plus a lost session |
 
-Every run turned up fixes that were committed afterwards; the commit log has them.
+Every run turned up fixes that were committed afterwards; the commit log has them. All of these runs used the 0.1.x layout (`docs/sdlc/`, no register views).
 
 ## What's next
-1. **Run 2: Terraform with environments, and CI/CD on GitHub.** This is the main path never run live. It also needs a GitHub repository for the pipeline and branch-protection evidence. Add the `dev-prod` environment set and the shared-account override to the same run; they cost little extra. Expect $130–150.
-2. **Watch the high tier at the small scale.** Run 3 spent about $130 on two slices of a 300-line service. `tuning.md` now caps the counts. A future high-tier run should show whether that's enough.
-3. **Still untested live, lower value:** the `dev`-only set, warm-standby and active-active DR, CDK in Python, medium and large scale, spikes and discovery mode. The suites cover their rules.
+1. **Check 0.2.0 live, cheaply.** Neither 0.2.0 change has been run live; the suites cover the hooks and the migration script, not the prompts. In a short run (or at the start of Run 2), check that:
+   - the orchestrator records questions-pass answers and learned rules in `decisions` and `practices` instead of trying to write the markdown;
+   - the planner leaves the rule sections of `practices.md` alone;
+   - agents read the register views rather than `state.json`;
+   - on a kept `docs/sdlc` project, the orchestrator offers the move first and the audit chain stays intact afterwards.
+2. **Run 2: Terraform with environments, and CI/CD on GitHub.** This is the main path never run live. It also needs a GitHub repository for the pipeline and branch-protection evidence. Add the `dev-prod` environment set and the shared-account override to the same run; they cost little extra. Expect $130–150.
+3. **Watch the high tier at the small scale.** Run 3 spent about $130 on two slices of a 300-line service. `tuning.md` now caps the counts. A future high-tier run should show whether that's enough.
+4. **Still untested live, lower value:** the `dev`-only set, warm-standby and active-active DR, CDK in Python, medium and large scale, spikes and discovery mode. The suites cover their rules.
 
 ## Open questions about the plugin
 - **Session cost.** One long session gets expensive: late turns cost far more than early ones, so the orchestrator checkpoints `resume` at each gate, pushes heavy work into agents and relies on compaction (the session-start hook re-orients it afterwards) instead of asking the user for a new session. If runs still overspend, look at what each stage's brief passes in.
+- **Should decisions and rules be checked against the user's words?** The approval guard checks gate approvals, risk acceptances, finding decisions and waivers against the prompts the user submitted, but not `decisions` answers or new `practices` rules. Answers are often gathered over several prompts, so a strict check may cause friction; decide after seeing how the orchestrator records them live.
 - **Review convergence.** Rework passes at the high tier tended to produce one more medium per re-check. The convergence rules in `tuning.md` should stop that; confirm in the next high-tier run.

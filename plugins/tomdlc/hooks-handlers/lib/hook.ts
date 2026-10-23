@@ -6,18 +6,18 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 export const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"] as const
 
 /** Orchestrator-only files under the project root. */
-export const STATE_FILE = "docs/sdlc/state.json"
+export const STATE_FILE = ".tomdlc/state.json"
 /** Archived segments of the audit log, written only by hooks when the live log rotates. */
-export const AUDIT_ARCHIVE_DIR = "docs/sdlc/audit-archive"
-export const DISPATCH_FILE = "docs/sdlc/.dispatch.json"
-export const DECISIONS_FILE = "docs/sdlc/decisions.md"
-export const TRACE_FILE = "docs/sdlc/traceability.md"
+export const AUDIT_ARCHIVE_DIR = ".tomdlc/audit-archive"
+export const DISPATCH_FILE = ".tomdlc/.dispatch.json"
+export const DECISIONS_FILE = ".tomdlc/decisions.md"
+export const TRACE_FILE = ".tomdlc/traceability.md"
 
 /** Hook-only files: nobody writes these with tools, not even the orchestrator. */
-export const AUDIT_FILE = "docs/sdlc/audit.jsonl"
-export const AUDIT_SNAPSHOT = "docs/sdlc/.audit-state.json"
-export const AUDIT_LOCK = "docs/sdlc/.audit.lock"
-export const REPORTS_DIR = "docs/sdlc/reports"
+export const AUDIT_FILE = ".tomdlc/audit.jsonl"
+export const AUDIT_SNAPSHOT = ".tomdlc/.audit-state.json"
+export const AUDIT_LOCK = ".tomdlc/.audit.lock"
+export const REPORTS_DIR = ".tomdlc/reports"
 
 export interface HookEvent {
   cwd?: string
@@ -103,14 +103,14 @@ export function mainCheckout(cwd: string): string | null {
 }
 
 /**
- * The project root that holds TomDLC's state (docs/sdlc): the nearest
- * ancestor of cwd with docs/sdlc, falling back to cwd. Inside a linked git
+ * The project root that holds TomDLC's state (.tomdlc): the nearest
+ * ancestor of cwd with .tomdlc, falling back to cwd. Inside a linked git
  * worktree it's the main checkout's, so every agent shares one
  * .dispatch.json, state and audit log.
  */
 export function projectRoot(cwd: string): string {
   const base = mainCheckout(cwd) ?? cwd
-  return findUp(base, (d) => existsSync(join(d, "docs", "sdlc"))) ?? resolve(base)
+  return findUp(base, (d) => existsSync(join(d, ".tomdlc"))) ?? resolve(base)
 }
 
 /** The tree the caller is working in: its git worktree's top when in one, else the project root. */

@@ -26,7 +26,7 @@ Every stage also needs:
 - [ ] Spikes needed before Design are listed
 - [ ] Risks & dependencies are listed in the plan and entered in the risk register
 - [ ] The branching strategy is recorded in `practices.md`
-- [ ] `docs/sdlc/practices.md` exists, with assumptions marked
+- [ ] `.tomdlc/practices.md` exists, with assumptions marked
 - [ ] If a questions pass ran, the confirmed answers are in `decisions.md` and reflected in the plan
 - [ ] Whether the system has a user interface is recorded, and the budget (or cost ceiling) per environment is set
 - [ ] *(existing code)* `00-codebase.md` exists, states its scan coverage, and lists the test command

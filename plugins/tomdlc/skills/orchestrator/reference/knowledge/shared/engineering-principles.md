@@ -1,6 +1,6 @@
 # Engineering principles
 
-How to keep designs, code, tests, pipelines, infrastructure and operations config small and easy to change. They apply to every file you write, alongside your other reference files. `docs/sdlc/practices.md` overrides them where it conflicts. These rules make you more careful, which costs some speed; for a one-line change, use judgment.
+How to keep designs, code, tests, pipelines, infrastructure and operations config small and easy to change. They apply to every file you write, alongside your other reference files. `.tomdlc/practices.md` overrides them where it conflicts. These rules make you more careful, which costs some speed; for a one-line change, use judgment.
 
 ## Think before you build
 - **State your assumptions.** If the brief, the design or the slice can be read more than one way, don't pick one silently. Choose the simplest reading that meets the Done-when, mark it `ASSUMPTION:` (in a code comment or your result) and list the question under **Questions for the user**.

@@ -1,6 +1,6 @@
 # Risk register
 
-The orchestrator keeps one register in `state.json` under `risks`, for everything that isn't a security finding: project, delivery, technical, compliance and cost risks, plus the assumptions, issues and dependencies the work relies on (a RAID log). Security weaknesses stay in the findings register, and threats in the threat model.
+The orchestrator keeps one register in `state.json` under `risks`, for everything that isn't a security finding: project, delivery, technical, compliance and cost risks, plus the assumptions, issues and dependencies the work relies on (a RAID log). Security weaknesses stay in the findings register, and threats in the threat model. A hook keeps a readable copy in `.tomdlc/risks.md`; read that, but change only the register.
 
 ## Entries
 

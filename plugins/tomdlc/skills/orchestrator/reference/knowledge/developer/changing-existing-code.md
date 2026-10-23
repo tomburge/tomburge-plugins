@@ -32,7 +32,7 @@ Put the blast radius in your result under **Files changed**: a table of files, d
 ## While changing
 - Preserve public signatures and behavior unless the slice says otherwise.
 - Don't refactor unrelated code in the same slice; note it under Findings instead.
-- Match the existing patterns of the code you're in, even where you'd choose differently, unless `docs/sdlc/practices.md` says otherwise.
+- Match the existing patterns of the code you're in, even where you'd choose differently, unless `.tomdlc/practices.md` says otherwise.
 - Keep commits or change notes small and tied to requirement IDs.
 
 Facts checked against primary sources on 2026-10-14.

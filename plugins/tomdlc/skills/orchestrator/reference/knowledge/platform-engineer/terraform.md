@@ -1,6 +1,6 @@
 # Terraform on AWS
 
-Defaults for projects whose IaC tool is Terraform. `docs/sdlc/practices.md` overrides any of them, and in an existing `infra/` tree, its established layout wins unless an ADR changes it.
+Defaults for projects whose IaC tool is Terraform. `.tomdlc/practices.md` overrides any of them, and in an existing `infra/` tree, its established layout wins unless an ADR changes it.
 
 Builds and tests run without credentials (see the devsecops engineer's pipeline-gates guide, "Credential-free builds"); only the user's plan, diff and apply steps use a profile. Accounts, identity, network, encryption and tagging defaults are in `aws-foundations.md`; environments, promotion and drift policy in `environments.md`. Tool versions and flags here were current in October 2026: check the release notes before relying on a version-specific feature.
 

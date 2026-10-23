@@ -14,7 +14,7 @@ Most defects that get past requirements are not exotic. They're ordinary conditi
 5. **Ask only what you can't decide.** If a sensible default exists, write it down as an assumption rather than turning it into a question. Questions are for conditions where any default would be a guess with real consequences.
 6. **Record the sweep** as an "Edge cases" table in `02-requirements.md`: flow or component, surface, condition, expected outcome, and how it was settled (requirement ID, assumption or out of scope).
 
-Also read `docs/sdlc/standards/requirements-analyst/edge-cases.md` if the brief lists it: it holds conditions this project has learned the hard way.
+Also read `.tomdlc/standards/requirements-analyst/edge-cases.md` if the brief lists it: it holds conditions this project has learned the hard way.
 
 ## Depth by risk tier
 
@@ -157,6 +157,6 @@ Every `FR-n` should have at least:
 
 ## Growing the list
 
-When a postmortem finds a defect caused by a condition nobody considered, the orchestrator adds that condition (with its expected outcome) to `docs/sdlc/standards/requirements-analyst/edge-cases.md`, so future sweeps in this project include it.
+When a postmortem finds a defect caused by a condition nobody considered, the orchestrator adds that condition (with its expected outcome) to `.tomdlc/standards/requirements-analyst/edge-cases.md`, so future sweeps in this project include it.
 
 Facts checked against primary sources on 2026-10-14.

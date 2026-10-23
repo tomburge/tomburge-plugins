@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 // PreToolUse hook for file writes and shell commands, active only inside
 // subagents. The main session (the orchestrator) is never restricted.
-//  - No subagent may write docs/sdlc/state.json or docs/sdlc/.dispatch.json;
+//  - No subagent may write .tomdlc/state.json or .tomdlc/.dispatch.json;
 //    only the orchestrator records stage state and dispatches.
+//  - Nobody writes the register views generated from state.json (risks.md,
+//    decisions.md and the rest in lib/registers.ts); they follow the registers.
 //  - A TomDLC agent with an entry in .dispatch.json may only write project
 //    files matching its `owns` globs, whether with the file tools or through
 //    shell commands whose targets can be read from the command (redirection,
@@ -13,8 +15,9 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import {
-  AUDIT_ARCHIVE_DIR, AUDIT_FILE, AUDIT_LOCK, AUDIT_SNAPSHOT, DECISIONS_FILE, TRACE_FILE, REPORTS_DIR, DISPATCH_FILE, STATE_FILE, dispatchKey, filePathOf, isSubagent, projectPath, projectRoot, readEvent, respond, samePath, tomdlcAgent,
+  AUDIT_ARCHIVE_DIR, AUDIT_FILE, AUDIT_LOCK, AUDIT_SNAPSHOT, TRACE_FILE, REPORTS_DIR, DISPATCH_FILE, STATE_FILE, dispatchKey, filePathOf, isSubagent, projectPath, projectRoot, readEvent, respond, samePath, tomdlcAgent,
 } from "./lib/hook.ts"
+import { GENERATED_FILES } from "./lib/registers.ts"
 import { simpleCommands, writeTargets } from "./lib/shell.ts"
 
 // Fallback for state files: commands that mention them and look like they write.
@@ -22,7 +25,7 @@ const SHELL_WRITE =
   /(>|\btee\b|\bsed\s+-i|\b(mv|cp|rm|dd|truncate)\b|\b(Set|Add|Clear)-Content\b|\bOut-File\b|\b(Remove|Move|Copy|New)-Item\b|\b(python3?|node|bun|deno|perl|ruby)\b)/i
 
 const STATE_REASON =
-  "TomDLC: only the orchestrator writes docs/sdlc/state.json, docs/sdlc/.dispatch.json and docs/sdlc/decisions.md. " +
+  "TomDLC: only the orchestrator writes .tomdlc/state.json and .tomdlc/.dispatch.json. " +
   "Report stage progress in your Gate self-assessment instead, and the orchestrator will record it."
 
 function deny(reason: string): void {
@@ -48,13 +51,19 @@ function ownedGlobs(root: string, key: string | null, agent: string | null): str
 /** A directory target counts as owned when files inside it would be. */
 const isOwned = (owns: string[], rel: string) => owns.some((g) => new Bun.Glob(g).match(rel) || new Bun.Glob(g).match(`${rel}/x`))
 
-const isStateFile = (rel: string) => [STATE_FILE, DISPATCH_FILE, DECISIONS_FILE, TRACE_FILE].some((f) => samePath(rel, f))
+const isStateFile = (rel: string) => [STATE_FILE, DISPATCH_FILE, TRACE_FILE].some((f) => samePath(rel, f))
+const isGenerated = (rel: string) => GENERATED_FILES.some((f) => samePath(rel, f))
+const mentionsGenerated = (lowered: string) => GENERATED_FILES.some((f) => lowered.includes(f.toLowerCase()))
+
+const GENERATED_REASON =
+  `TomDLC: ${GENERATED_FILES.join(", ")} are generated from the registers in .tomdlc/state.json by a hook after every state.json write. ` +
+  "The orchestrator changes the register in state.json with Edit and the file follows; agents report what should change under Findings or Handoffs."
 const isAuditFile = (rel: string) =>
   samePath(rel, AUDIT_FILE) || samePath(rel, AUDIT_SNAPSHOT) || samePath(rel, AUDIT_LOCK) || rel.toLowerCase().startsWith(REPORTS_DIR.toLowerCase() + "/") ||
   rel.toLowerCase().startsWith(AUDIT_ARCHIVE_DIR.toLowerCase() + "/") || samePath(rel, AUDIT_ARCHIVE_DIR)
 
 const AUDIT_REASON =
-  "TomDLC: docs/sdlc/audit.jsonl, docs/sdlc/.audit-state.json and docs/sdlc/reports/ are written only by the plugin's hooks, so the audit trail stays append-only. " +
+  "TomDLC: .tomdlc/audit.jsonl, .tomdlc/.audit-state.json and .tomdlc/reports/ are written only by the plugin's hooks, so the audit trail stays append-only. " +
   "Nothing needs to edit them; if the log looks wrong, tell the user."
 
 const outsideReason = (rels: string[], agent: string | null, owns: string[]) =>
@@ -83,21 +92,23 @@ const NUL_REDIRECT = /(^|[^\w/])&?\d?>>?\s*nul(?=$|[\s;&|)])/i
 
 if (event.tool_name === "Bash" && NUL_REDIRECT.test(command)) {
   deny("TomDLC: in Bash, discard output with /dev/null (e.g. 2>/dev/null), not NUL: Bash writes a file named NUL instead. In PowerShell, use $null.")
-} else if (rels.some(isAuditFile) || (isShell && /audit\.jsonl|\.audit-state\.json|docs\/sdlc\/reports\/|docs\/sdlc\/audit-archive/.test(lowered) && SHELL_WRITE.test(lowered))) {
+} else if (rels.some(isAuditFile) || (isShell && /audit\.jsonl|\.audit-state\.json|\.tomdlc\/reports\/|\.tomdlc\/audit-archive/.test(lowered) && SHELL_WRITE.test(lowered))) {
   deny(AUDIT_REASON)
+} else if (rels.some(isGenerated) || (isShell && mentionsGenerated(lowered) && SHELL_WRITE.test(lowered))) {
+  deny(GENERATED_REASON)
 } else if (!isSubagent(event)) {
   // The orchestrator writes state.json and .dispatch.json with Write or Edit, so the state checker
   // and approval guard see every change; a visible shell write skips them.
   const shellState = isShell &&
     (rels.some((r) => samePath(r, STATE_FILE) || samePath(r, DISPATCH_FILE)) ||
-      (/docs\/sdlc\/(state|\.dispatch)\.json/.test(lowered) && /(\btee\b|\bsed\s+-i|\b(mv|cp)\b|\b(Set|Add)-Content\b|\bOut-File\b|\b(Move|Copy)-Item\b|writeFile|\.write\(|json\.dump\()/i.test(command)))
+      (/\.tomdlc\/(state|\.dispatch)\.json/.test(lowered) && /(\btee\b|\bsed\s+-i|\b(mv|cp)\b|\b(Set|Add)-Content\b|\bOut-File\b|\b(Move|Copy)-Item\b|writeFile|\.write\(|json\.dump\()/i.test(command)))
   // Scripts that write it without showing it are caught after the command by audit-events.ts.
   if (shellState)
-    deny("TomDLC: write docs/sdlc/state.json and .dispatch.json with the Write or Edit tool, not a shell command or script, so the state checker and approval guard check the change.")
+    deny("TomDLC: write .tomdlc/state.json and .dispatch.json with the Write or Edit tool, not a shell command or script, so the state checker and approval guard check the change.")
   else respond()
 } else {
   const owns = ownedGlobs(root, key, agent)
-  const mentionsState = [STATE_FILE, DISPATCH_FILE, DECISIONS_FILE].some((f) => lowered.includes(f.split("/").slice(-2).join("/")))
+  const mentionsState = [STATE_FILE, DISPATCH_FILE].some((f) => lowered.includes(f.split("/").slice(-2).join("/")))
 
   if (rels.some(isStateFile) || (isShell && mentionsState && SHELL_WRITE.test(lowered))) {
     deny(STATE_REASON)

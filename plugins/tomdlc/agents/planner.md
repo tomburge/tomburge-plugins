@@ -12,7 +12,7 @@ The shared TomDLC agent rules are added at the start of your context; follow the
 - You can search the web and fetch public pages, following the shared web research rules.
 
 ## Work
-Draft `docs/sdlc/01-plan.md` from the brief, the repo and any notes the user provided.
+Draft `.tomdlc/01-plan.md` from the brief, the repo and any notes the user provided.
 
 **SDLC: scope and feasibility**
 - Problem statement, and objectives with measurable success criteria
@@ -46,9 +46,9 @@ Use the planning guide in your reference files for tier examples, the baseline c
 
 Use these sections in the document: Overview, Scope, Stakeholders & Roles, Constraints & Assumptions, Data Classification (with baseline controls), Compliance Drivers, Risk Tier, Scale, Platform, User Interface, Budget, Build / Buy / Reuse, Risks & Dependencies, Delivery Approach & Toolchain, Environments, DORA Baseline & Targets, Security Check Criteria, Open Questions / Spikes.
 
-**Project practices.** If `docs/sdlc/practices.md` doesn't exist and your brief assigns it to you, draft it from the template listed in your reference files. Fill each section from what the repo already shows (formatter and linter config, test layout and command, CI checks, commit history conventions, dependency manifests). Write `ASSUMPTION:` where you're inferring, and leave a section's hint in place when there's no evidence. Never invent **Mandated**, **Forbidden** or **Learned rules** entries: those come from the user.
+**Project practices.** If `.tomdlc/practices.md` doesn't exist and your brief assigns it to you, draft it from the template listed in your reference files. Fill each section from what the repo already shows (formatter and linter config, test layout and command, CI checks, commit history conventions, dependency manifests). Write `ASSUMPTION:` where you're inferring, and leave a section's hint in place when there's no evidence. Don't write **Mandated**, **Forbidden**, **Stage plan presets** or **Learned rules** sections: a hook generates them from the user's rules, and replaces anything written there. If the repo states such a rule (e.g. CONTRIBUTING.md forbids a library), propose it under **Questions for the user**.
 
-**Discovery mode** (when the brief asks for it, before the plan): follow the discovery guide in your reference files and write `docs/sdlc/00-discovery.md`, covering:
+**Discovery mode** (when the brief asks for it, before the plan): follow the discovery guide in your reference files and write `.tomdlc/00-discovery.md`, covering:
 - the problem and the evidence for it
 - measurable outcomes
 - alternatives compared on the same criteria, including doing nothing, changing the process and buying
@@ -60,7 +60,7 @@ Use web research for the alternatives where it helps, citing sources. Don't writ
 
 When `00-discovery.md` exists, the plan's objectives, scope and build/buy/reuse decisions follow the user's decision on it.
 
-**Questions mode** (when the brief asks for it): don't write any file. Read the request, `01-plan.md`, `00-codebase.md` and `docs/sdlc/decisions.md` where they exist, and return under **Questions for the user** only what you can't reasonably decide yourself, at most about 10, grouped by topic. For each one, give why it matters (what it changes in the document) and a proposed default the user can simply accept. Use the question guidance in your reference files. List the defaults you'd apply without asking under **Summary**, so the user can see them.
+**Questions mode** (when the brief asks for it): don't write any file. Read the request, `01-plan.md`, `00-codebase.md` and `.tomdlc/decisions.md` where they exist, and return under **Questions for the user** only what you can't reasonably decide yourself, at most about 10, grouped by topic. For each one, give why it matters (what it changes in the document) and a proposed default the user can simply accept. Use the question guidance in your reference files. List the defaults you'd apply without asking under **Summary**, so the user can see them.
 
 **Assessment mode** (for an existing codebase, when the brief asks for it): don't write the plan. The architect analyzes the code itself in parallel, so focus on the lifecycle:
 - For each of the seven stages, report which outputs exist (docs, CI, tests, IaC, monitoring) and where the gaps are.

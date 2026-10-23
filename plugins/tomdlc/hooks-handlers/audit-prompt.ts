@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // UserPromptSubmit hook. In TomDLC projects, records what the user actually
-// typed in docs/sdlc/audit.jsonl (with secrets redacted), so approvals and
+// typed in .tomdlc/audit.jsonl (with secrets redacted), so approvals and
 // decisions that state.json attributes to the user can be checked against
 // real prompts by the approval guard. Never blocks a prompt.
 //

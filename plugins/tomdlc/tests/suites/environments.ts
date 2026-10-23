@@ -18,24 +18,24 @@ function expect(name: string, got: unknown, want: unknown) {
 }
 const dec = (o: any) => o.hookSpecificOutput?.permissionDecision ?? o.decision ?? "allow"
 
-const DIR = join(SP, "proj-env"); mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
-const P = DIR.replaceAll("\\", "/"), STATE = join(DIR, "docs/sdlc/state.json"), AUDIT = join(DIR, "docs/sdlc/audit.jsonl")
+const DIR = join(SP, "proj-env"); mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
+const P = DIR.replaceAll("\\", "/"), STATE = join(DIR, ".tomdlc/state.json"), AUDIT = join(DIR, ".tomdlc/audit.jsonl")
 const events = () => readFileSync(AUDIT, "utf8").trim().split("\n").map((l) => JSON.parse(l))
 const prompt = (text: string) => run("audit-prompt.ts", { hook_event_name: "UserPromptSubmit", cwd: P, prompt: text })
 let lastReason = ""
 /** Guard, then (if allowed) write, validate and audit, like Claude Code would. */
 async function writeState(s: unknown): Promise<string> {
   const content = JSON.stringify(s, null, 2)
-  const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json`, content } })
+  const g = await run("approval-guard.ts", { hook_event_name: "PreToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json`, content } })
   lastReason = g.hookSpecificOutput?.permissionDecisionReason ?? ""
   if (dec(g) !== "allow") return "deny"
   writeFileSync(STATE, content)
-  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
   return "allow"
 }
 const validate = async (s: unknown) => {
   writeFileSync(STATE, JSON.stringify(s, null, 2))
-  const v = await run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  const v = await run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
   return { d: dec(v), reason: String(v.reason ?? "") }
 }
 
@@ -116,7 +116,7 @@ expect("Deploy passed with verified stage and prod promotions valid", (await val
 
 // ---- the guard: "Approve", after the promotion was requested
 writeFileSync(STATE, JSON.stringify({ ...base, environments: env() }, null, 2))
-await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 await prompt("Set up the environments as discussed.")
 let state: any = { ...base, environments: env() }
 const withPromotions = (ps: object[]) => ({ ...state, environments: { ...state.environments, promotions: ps } })
@@ -139,7 +139,7 @@ state = withPromotions([ok("P-1", "stage")])
 // ---- the guard: sharing an account needs the user's words
 const sharedEnv = { ...state.environments, stage: { account: "333333333333", profile: "acme-stage" } }
 writeFileSync(STATE, JSON.stringify({ ...state, environments: sharedEnv }, null, 2))
-await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 expect("environments_set notes the shared account", events().at(-1)?.sharedAccounts?.[0]?.environments, ["stage", "prod"])
 state = { ...state, environments: sharedEnv }
 expect("invented shared-account approval denied",
@@ -173,8 +173,8 @@ for (const c of ["npx cdk deploy -c env=stage", "npx cdk deploy AppStage", "npx 
   expect(`non-prod or unnamed target asks: ${c}`, await pg(c), "ask")
 expect("words like reproduce aren't a prod target", await pg("npx cdk deploy ReproduceStack"), "ask")
 {
-  const D3 = join(SP, "proj-noenv"); mkdirSync(join(D3, "docs/sdlc"), { recursive: true })
-  writeFileSync(join(D3, "docs/sdlc/state.json"), JSON.stringify({ project: "x", currentStage: "develop", platform: { cloud: "aws", iac: "terraform" } }))
+  const D3 = join(SP, "proj-noenv"); mkdirSync(join(D3, ".tomdlc"), { recursive: true })
+  writeFileSync(join(D3, ".tomdlc/state.json"), JSON.stringify({ project: "x", currentStage: "develop", platform: { cloud: "aws", iac: "terraform" } }))
   const c3: string = (await run("on-session-start.ts", { cwd: D3.replaceAll("\\", "/"), source: "startup" })).hookSpecificOutput?.additionalContext ?? ""
   expect("session start prompts a cloud project with no environments", c3.includes("No `environments` recorded for this cloud project"), true)
 }

@@ -16,10 +16,10 @@ The shared TomDLC agent rules are added at the start of your context; follow the
 Follow the reviewing guide in your reference files: its stance, evidence rules, severities, verdict rule and the checklist for your mode.
 
 ### Requirements mode
-Review `docs/sdlc/02-requirements.md` against `01-plan.md` (and `00-codebase.md` if it exists), as described in the requirements checklist: testable, traceable, consistent, complete, measurable NFRs, well-formed stories, sound assumptions, feasible.
+Review `.tomdlc/02-requirements.md` against `01-plan.md` (and `00-codebase.md` if it exists), as described in the requirements checklist: testable, traceable, consistent, complete, measurable NFRs, well-formed stories, sound assumptions, feasible.
 
 ### Architecture mode
-Review `docs/sdlc/03-design.md`, and `03-ux.md`, the API contract files and `03-threat-model.md` when they exist, against `02-requirements.md`, as described in the architecture checklist: coverage, structure, cross-references, achievable targets, consistency between documents, functional design, change safety, decisions, and, when there's a UX spec, its product-side review (every story has a home, complete navigation, states that lead somewhere, edge cases designed, wireframes that match the flows). Leave security depth and the pillar questions to the security-reviewer.
+Review `.tomdlc/03-design.md`, and `03-ux.md`, the API contract files and `03-threat-model.md` when they exist, against `02-requirements.md`, as described in the architecture checklist: coverage, structure, cross-references, achievable targets, consistency between documents, functional design, change safety, decisions, and, when there's a UX spec, its product-side review (every story has a home, complete navigation, states that lead somewhere, edge cases designed, wireframes that match the flows). Leave security depth and the pillar questions to the security-reviewer.
 
 ### Code mode
 Review the slice (or the change) named in your brief, as described in the code checklist: matches the design and contracts, implements the functional design, error handling, tests that would catch regressions, coding standards and the slice's Done-when. Run the test command and the traceability check from your brief, and base findings on their output where relevant. Leave security to the security-reviewer.

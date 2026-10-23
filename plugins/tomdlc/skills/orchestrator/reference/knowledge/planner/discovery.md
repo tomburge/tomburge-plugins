@@ -1,6 +1,6 @@
 # Discovery
 
-An optional step before the plan, for when it isn't yet clear that the problem is worth solving, or that this solution is the right one. It answers: is the problem real, who has it, what else could solve it, and what's the smallest thing worth building? Write `docs/sdlc/00-discovery.md`.
+An optional step before the plan, for when it isn't yet clear that the problem is worth solving, or that this solution is the right one. It answers: is the problem real, who has it, what else could solve it, and what's the smallest thing worth building? Write `.tomdlc/00-discovery.md`.
 
 Run it when:
 - it's a new product or a significant feature whose problem hasn't been validated

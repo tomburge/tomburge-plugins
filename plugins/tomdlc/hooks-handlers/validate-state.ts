@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
-// PostToolUse hook for Write/Edit/MultiEdit. After docs/sdlc/state.json or
-// docs/sdlc/.dispatch.json is written, checks it against the schema in the
+// PostToolUse hook for Write/Edit/MultiEdit. After .tomdlc/state.json or
+// .tomdlc/.dispatch.json is written, checks it against the schema in the
 // orchestrator skill and reports problems back to Claude.
 import { validateEnvironments } from "./lib/environments.ts"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DISPATCH_FILE, STAGES, STATE_FILE, filePathOf, projectPath, projectRoot, readEvent, respond, samePath } from "./lib/hook.ts"
+import { PRACTICE_KINDS } from "./lib/registers.ts"
 
 const STATUSES = ["not-started", "in-progress", "passed", "passed-with-waivers", "skipped"]
 const TIERS = ["low", "moderate", "high"]
@@ -126,6 +127,8 @@ function validateState(s: any, root: string): string[] {
   errors.push(...validateResume(s.resume))
   errors.push(...validateRisks(s.risks))
   errors.push(...validateSpikes(s.spikes))
+  errors.push(...validateDecisions(s.decisions))
+  errors.push(...validatePractices(s.practices))
   errors.push(...validatePlanDependencies(s, root))
 
   if (s.completedChanges != null && !Array.isArray(s.completedChanges)) {
@@ -166,6 +169,50 @@ function validateSpikes(sp: any): string[] {
   return errors
 }
 
+/** Each entry needs a unique ID matching `pattern` (e.g. D-n); returns the errors, tracking IDs in `seen`. */
+function checkId(x: any, at: string, pattern: RegExp, label: string, seen: Set<string>): string[] {
+  if (!pattern.test(String(x.id ?? ""))) return [`\`${at}.id\` must look like ${label}`]
+  if (seen.has(x.id)) return [`ID ${x.id} is used more than once`]
+  seen.add(x.id)
+  return []
+}
+
+function validateDecisions(d: any): string[] {
+  if (d == null) return []
+  if (!Array.isArray(d)) return ["`decisions` must be an array"]
+  const errors: string[] = []
+  const seen = new Set<string>()
+  d.forEach((x: any, i: number) => {
+    const at = `decisions[${i}]`
+    if (!isObj(x)) return errors.push(`\`${at}\` must be an object`)
+    errors.push(...checkId(x, at, /^D-\d+$/, "D-n", seen))
+    if (!/^\d{4}-\d{2}-\d{2}/.test(String(x.date ?? ""))) errors.push(`\`${at}.date\` must be an ISO date`)
+    if (!(stageName(x.stage) || x.stage === "orient")) errors.push(`\`${at}.stage\` must be a stage or \`orient\``)
+    if (x.change != null && !/^CH-\d+$/.test(String(x.change))) errors.push(`\`${at}.change\` must look like CH-n`)
+    if (!isStr(x.question) || !isStr(x.answer)) errors.push(`\`${at}\` needs \`question\` and \`answer\` (the user's words verbatim, or the default they accepted)`)
+    for (const f of ["default", "confirmed"]) if (x[f] != null && typeof x[f] !== "boolean") errors.push(`\`${at}.${f}\` must be true or false`)
+  })
+  return errors
+}
+
+function validatePractices(p: any): string[] {
+  if (p == null) return []
+  if (!Array.isArray(p)) return ["`practices` must be an array"]
+  const errors: string[] = []
+  const seen = new Set<string>()
+  p.forEach((x: any, i: number) => {
+    const at = `practices[${i}]`
+    if (!isObj(x)) return errors.push(`\`${at}\` must be an object`)
+    errors.push(...checkId(x, at, /^RULE-\d+$/, "RULE-n", seen))
+    if (!PRACTICE_KINDS.includes(x.kind)) errors.push(`\`${at}.kind\` must be one of ${PRACTICE_KINDS.join(", ")}`)
+    if (!isStr(x.rule)) errors.push(`\`${at}.rule\` is required`)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x.date ?? ""))) errors.push(`\`${at}.date\` must be YYYY-MM-DD`)
+    if (x.kind === "preset" && !isStr(x.name)) errors.push(`\`${at}\` is a preset and needs a \`name\``)
+    if (x.kind === "learned" && !isStr(x.why)) errors.push(`\`${at}\` is a learned rule and needs \`why\``)
+  })
+  return errors
+}
+
 function validateRisks(r: any): string[] {
   if (r == null) return []
   if (!Array.isArray(r)) return ["`risks` must be an array"]
@@ -194,10 +241,10 @@ function validatePlanDependencies(s: any, root: string): string[] {
   if (!isObj(plan) || s.change.shape === "docs-only") return []
   const errors: string[] = []
   const runs = (stage: string) => ["run", "light"].includes(plan[stage]?.action)
-  const exists = (doc: string) => existsSync(join(root, "docs", "sdlc", doc))
+  const exists = (doc: string) => existsSync(join(root, ".tomdlc", doc))
   for (const [stage, need] of Object.entries(NEEDS)) {
     if (runs(stage) && plan[need.producer]?.action === "skip" && !need.docs.some(exists))
-      errors.push(`the change plan runs ${stage} but skips ${need.producer}, and none of ${need.docs.map((x) => "docs/sdlc/" + x).join(" or ")} exists yet; run ${need.producer} (at least light) or adjust the plan`)
+      errors.push(`the change plan runs ${stage} but skips ${need.producer}, and none of ${need.docs.map((x) => ".tomdlc/" + x).join(" or ")} exists yet; run ${need.producer} (at least light) or adjust the plan`)
   }
   if (s.riskTier === "high" && runs("develop") && plan.design?.action === "skip")
     errors.push("at the high tier, a change that runs develop must not skip design: run it at least light so the threat model is checked")

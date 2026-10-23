@@ -4,7 +4,7 @@ Defaults for the AWS platform under a workload. Use them in Design with the arch
 
 ## How to use these defaults
 - The tier sets the baseline (see `../../tuning.md`). Scale changes how much is written about it, never the controls.
-- Record the platform in `docs/sdlc/03-design.md`: accounts, network, identity, data protection, logging, cost estimate and quotas. Write an ADR for account structure, region choice, compute choice and anything hard to reverse.
+- Record the platform in `.tomdlc/03-design.md`: accounts, network, identity, data protection, logging, cost estimate and quotas. Write an ADR for account structure, region choice, compute choice and anything hard to reverse.
 - Link each control to the SR-n or NFR-n it satisfies and the T-n it mitigates. A platform control with no requirement behind it is either missing a requirement or not needed.
 - A weaker setting than the tier's default needs a waiver (W-n) with an owner and an expiry. A stronger one just needs a reason.
 - You never apply. At Deploy, hand over the `terraform plan` output (saved plan file plus a readable summary) or the `cdk diff` and synthesized template, with every destroy, replace and IAM or security group change called out. The user or the pipeline applies.

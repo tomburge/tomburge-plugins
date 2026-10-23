@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { H, SP, SCRIPTS } from "../lib/harness.ts"
 const DIR = join(SP, "proj5"), P = DIR.replaceAll("\\", "/")
 rmSync(DIR, { recursive: true, force: true })
-mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
-const STATE = join(DIR, "docs/sdlc/state.json"), AUDIT = join(DIR, "docs/sdlc/audit.jsonl")
+mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
+const STATE = join(DIR, ".tomdlc/state.json"), AUDIT = join(DIR, ".tomdlc/audit.jsonl")
 let fails = 0, total = 0
 async function run(hook: string, ev: object) {
   const p = Bun.spawn([process.execPath, join(H, hook)], { stdin: new TextEncoder().encode(JSON.stringify(ev)), stdout: "pipe" })
@@ -22,11 +22,11 @@ function expect(name: string, got: unknown, want: unknown) {
 const events = () => (existsSync(AUDIT) ? readFileSync(AUDIT, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [])
 const validate = async (s: any) => {
   writeFileSync(STATE, JSON.stringify(s))
-  return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 }
 const audit = async (s: any) => {
   writeFileSync(STATE, JSON.stringify(s))
-  return run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  return run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 }
 const dec = (o: any) => o.decision ?? o.hookSpecificOutput?.permissionDecision ?? "allow"
 
@@ -45,17 +45,17 @@ const bugfix = plan({ plan: "skip", requirements: "light", design: "skip", deplo
 let r = await validate(base("bugfix", bugfix))
 expect("bugfix with nothing to build on is blocked", dec(r), "block")
 expect("names develop and design", String(r.reason).includes("runs develop but skips design"), true)
-writeFileSync(join(DIR, "docs/sdlc/01-plan.md"), "# Plan\n")
-writeFileSync(join(DIR, "docs/sdlc/03-design.md"), "# Design\n")
+writeFileSync(join(DIR, ".tomdlc/01-plan.md"), "# Plan\n")
+writeFileSync(join(DIR, ".tomdlc/03-design.md"), "# Design\n")
 expect("bugfix with existing plan and design allowed", dec(await validate(base("bugfix", bugfix))), "allow")
-rmSync(join(DIR, "docs/sdlc/03-design.md"))
-writeFileSync(join(DIR, "docs/sdlc/00-codebase.md"), "# Codebase\n")
+rmSync(join(DIR, ".tomdlc/03-design.md"))
+writeFileSync(join(DIR, ".tomdlc/00-codebase.md"), "# Codebase\n")
 expect("codebase analysis stands in for design", dec(await validate(base("bugfix", bugfix))), "allow")
 expect("high tier code change can't skip design", String((await validate(base("bugfix", bugfix, "high"))).reason).includes("must not skip design"), true)
 expect("docs-only is exempt", dec(await validate(base("docs-only", plan({ plan: "skip", requirements: "skip", design: "skip", develop: "light", test: "skip", deploy: "skip", maintain: "skip" }), "high"))), "allow")
 const noTest = plan({ test: "skip" })
 expect("deploy without test report blocked", String((await validate(base("feature", noTest))).reason).includes("runs deploy but skips test"), true)
-rmSync(join(DIR, "docs/sdlc/00-codebase.md"))
+rmSync(join(DIR, ".tomdlc/00-codebase.md"))
 
 // ---- risk register and deployment record schemas
 const ok: any = { ...base("feature", plan({})), currentStage: "deploy",
@@ -65,8 +65,8 @@ const ok: any = { ...base("feature", plan({})), currentStage: "deploy",
     { id: "R-3", type: "risk", description: "Cost spike", likelihood: "low", impact: "low", treatment: "accept", decision: 'User: "fine"', owner: "tom", status: "open" },
   ] }
 ok.stages.deploy = { status: "in-progress", deployment: { at: "2026-10-12", version: "1.0.0", environment: "production", outcome: "succeeded" } }
-writeFileSync(join(DIR, "docs/sdlc/05-test-report.md"), "# Tests\n")
-writeFileSync(join(DIR, "docs/sdlc/02-requirements.md"), "# Req\n")
+writeFileSync(join(DIR, ".tomdlc/05-test-report.md"), "# Tests\n")
+writeFileSync(join(DIR, ".tomdlc/02-requirements.md"), "# Req\n")
 expect("valid risks and deployment", dec(await validate(ok)), "allow")
 const bad = async (name: string, s: any, frag: string) => {
   const res = await validate(s)
@@ -93,7 +93,7 @@ await bad("bad outcome", { ...ok, stages: { ...ok.stages, deploy: { status: "in-
 await bad("deployment on wrong stage", { ...ok, stages: { ...ok.stages, test: { status: "not-started", deployment: ok.stages.deploy.deployment } } }, "only allowed on deploy")
 
 // ---- audit events: risks, deployment, artifacts, reports
-rmSync(AUDIT, { force: true }); rmSync(join(DIR, "docs/sdlc/.audit-state.json"), { force: true })
+rmSync(AUDIT, { force: true }); rmSync(join(DIR, ".tomdlc/.audit-state.json"), { force: true })
 const s1: any = { ...ok, risks: [ok.risks[0]], stages: { ...ok.stages, deploy: { status: "in-progress" } } }
 await audit(s1)
 let n = events().length
@@ -120,26 +120,26 @@ expect("artifact hash", typeof art[0]?.sha256 === "string" && art[0].sha256.leng
 const report = "Done.\n### Summary\nNOT READY: 1 high\n### Files changed\nNone.\n### Gate self-assessment\nx\n### Questions for the user\nNone.\n### Handoffs\nNone.\n### Findings\n- high: missing authz check"
 await run("audit-events.ts", { hook_event_name: "SubagentStop", cwd: P, agent_id: "abcdef123456", agent_type: "tomdlc:reviewer", last_assistant_message: report })
 const stopped = events().at(-1)
-expect("report path logged", typeof stopped.report === "string" && stopped.report.startsWith("docs/sdlc/reports/"), true)
+expect("report path logged", typeof stopped.report === "string" && stopped.report.startsWith(".tomdlc/reports/"), true)
 expect("report saved with stage and agent", /-deploy-reviewer-abcdef12\.md$/.test(stopped.report ?? ""), true)
 expect("report content kept", readFileSync(join(DIR, stopped.report), "utf8").includes("missing authz check"), true)
 await run("audit-events.ts", { hook_event_name: "SubagentStop", cwd: P, agent_id: "zz", agent_type: "Explore", last_assistant_message: "hi" })
-expect("non-TomDLC agents get no report", readdirSync(join(DIR, "docs/sdlc/reports"), { recursive: true }).filter((f) => String(f).endsWith(".md")).length, 1)
-expect("reports go in a monthly folder", /^docs\/sdlc\/reports\/\d{4}-\d{2}\/\d{8}-/.test(String(stopped.report)), true)
+expect("non-TomDLC agents get no report", readdirSync(join(DIR, ".tomdlc/reports"), { recursive: true }).filter((f) => String(f).endsWith(".md")).length, 1)
+expect("reports go in a monthly folder", /^\.tomdlc\/reports\/\d{4}-\d{2}\/\d{8}-/.test(String(stopped.report)), true)
 
 // ---- reports are hook-only
 const og = (ev: object, tool: string, input: object) => run("ownership-guard.ts", { cwd: P, ...ev, tool_name: tool, tool_input: input }).then(dec)
 expect("main can't edit a report", await og({}, "Edit", { file_path: `${P}/${stopped.report}` }), "deny")
-expect("agent can't write a report", await og({ agent_id: "a", agent_type: "tomdlc:reviewer" }, "Write", { file_path: `${P}/docs/sdlc/reports/fake.md` }), "deny")
-expect("shell write to reports denied", await og({}, "Bash", { command: "echo x > docs/sdlc/reports/fake.md" }), "deny")
-expect("reading reports allowed", await og({}, "Bash", { command: "cat docs/sdlc/reports/*.md" }), "allow")
-expect("agents can't write traceability.md", await og({ agent_id: "a", agent_type: "tomdlc:tester" }, "Write", { file_path: `${P}/docs/sdlc/traceability.md` }), "deny")
-expect("the orchestrator can", await og({}, "Write", { file_path: `${P}/docs/sdlc/traceability.md` }), "allow")
+expect("agent can't write a report", await og({ agent_id: "a", agent_type: "tomdlc:reviewer" }, "Write", { file_path: `${P}/.tomdlc/reports/fake.md` }), "deny")
+expect("shell write to reports denied", await og({}, "Bash", { command: "echo x > .tomdlc/reports/fake.md" }), "deny")
+expect("reading reports allowed", await og({}, "Bash", { command: "cat .tomdlc/reports/*.md" }), "allow")
+expect("agents can't write traceability.md", await og({ agent_id: "a", agent_type: "tomdlc:tester" }, "Write", { file_path: `${P}/.tomdlc/traceability.md` }), "deny")
+expect("the orchestrator can", await og({}, "Write", { file_path: `${P}/.tomdlc/traceability.md` }), "allow")
 
 // ---- accepted risks need the user's words
 const guard = async (prev: any, next: any) => {
   writeFileSync(STATE, JSON.stringify(prev))
-  return dec(await run("approval-guard.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json`, content: JSON.stringify(next) } }))
+  return dec(await run("approval-guard.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json`, content: JSON.stringify(next) } }))
 }
 await run("audit-prompt.ts", { cwd: P, prompt: "Accept the cost risk, it's tiny." })
 const risky = { ...s1, risks: [{ ...ok.risks[0], treatment: "accept", decision: "User accepted it" }] }
@@ -147,13 +147,13 @@ expect("paraphrased risk acceptance denied", await guard(s1, risky), "deny")
 expect("quoted risk acceptance allowed", await guard(s1, { ...risky, risks: [{ ...risky.risks[0], decision: 'User: "Accept the cost risk, it\'s tiny."' }] }), "allow")
 
 // ---- check-trace on a synthetic project
-const T = join(SP, "proj6"); rmSync(T, { recursive: true, force: true }); mkdirSync(join(T, "docs/sdlc"), { recursive: true }); mkdirSync(join(T, "tests"))
-writeFileSync(join(T, "docs/sdlc/02-requirements.md"), [
+const T = join(SP, "proj6"); rmSync(T, { recursive: true, force: true }); mkdirSync(join(T, ".tomdlc"), { recursive: true }); mkdirSync(join(T, "tests"))
+writeFileSync(join(T, ".tomdlc/02-requirements.md"), [
   "### FR-1 Convert — Must", "### FR-2 Help — Must", "### FR-3 Version — Should", "### FR-2 Help again — Must",
   "| ID | Req |", "|---|---|", "| SR-1 | Validate input (Must) |", "| SR-2 | Escape output |",
   "## Traceability", "| SR-1 | V5 | unit |", "- AC-1.2 criterion detail (not an abuse case)",
 ].join("\n"))
-writeFileSync(join(T, "docs/sdlc/03-design.md"), "# Design\nCovers FR-1 and SR-1, SR-9.\n## Delivery Slices\n| S-1 | delivers FR-1 |\n## Other\nFR-2 mentioned outside slices\n")
+writeFileSync(join(T, ".tomdlc/03-design.md"), "# Design\nCovers FR-1 and SR-1, SR-9.\n## Delivery Slices\n| S-1 | delivers FR-1 |\n## Other\nFR-2 mentioned outside slices\n")
 writeFileSync(join(T, "tests/test_convert.py"), "# FR-1 SR-1\ndef test_x(): pass\n")
 const tr = JSON.parse(await script("check-trace.ts", T.replaceAll("\\", "/"), "--json"))
 expect("undefined SR-9", tr.undefined.map((u: any) => u.id), ["SR-9"])
@@ -166,14 +166,14 @@ expect("not verified", tr.notVerified, ["FR-2", "SR-2"])
 expect("text report readable", (await script("check-trace.ts", T.replaceAll("\\", "/"))).includes("Undefined IDs: SR-9"), true)
 
 // sub-parts, Delivers rows, ranges and the matrix
-writeFileSync(join(T, "docs/sdlc/03-design.md"), [
+writeFileSync(join(T, ".tomdlc/03-design.md"), [
   "# Design", "Covers FR-1, FR-2, FR-3 and SR-1, SR-2. SR-1a is split out.",
   "## Delivery Slices",
   "### S-1 Core", "| Field | Content |", "|---|---|", "| Delivers | FR-1..FR-2; SR-1a |", "| Done when | FR-3 tests pass too |",
   "### S-2 Extra", "| Field | Content |", "|---|---|", "| Delivers | FR-3, SR-2 |",
   "## Other", "Nothing.",
 ].join("\n"))
-writeFileSync(join(T, "docs/sdlc/05-security-test.md"), "SR-2 verified by fuzzing; SR-1b checked.\n")
+writeFileSync(join(T, ".tomdlc/05-security-test.md"), "SR-2 verified by fuzzing; SR-1b checked.\n")
 const tr2 = JSON.parse(await script("check-trace.ts", T.replaceAll("\\", "/"), "--json"))
 expect("part reference SR-1a isn't undefined", tr2.undefined.some((u: any) => u.id === "SR-1a"), false)
 expect("SR-9 no longer referenced", tr2.undefined.length, 0)
@@ -188,7 +188,7 @@ expect("tests column lists the test file", row("FR-1").includes("tests/test_conv
 expect("missing evidence is flagged", row("FR-3").includes("**missing**"), true)
 
 // slice field tables: the template's "| ID | S-n |" row, and "| Field | S-n |" headers
-writeFileSync(join(T, "docs/sdlc/03-design.md"), [
+writeFileSync(join(T, ".tomdlc/03-design.md"), [
   "# Design", "Covers FR-1, FR-2, FR-3 and SR-1, SR-2.",
   "## Delivery Slices",
   "| Field | Content |", "|---|---|", "| ID | `S-1` |", "| Delivers | FR-1, FR-2 |", "| Depends on | — |",
@@ -205,15 +205,15 @@ expect("Depends-on mention isn't a delivery", row3("FR-1").includes("S-2"), fals
 expect("Must FRs present: no warning", tr3.noMustFRs, false)
 
 // no FR marked Must: the Must checks are vacuous, so warn
-writeFileSync(join(T, "docs/sdlc/02-requirements.md"), "| ID | Req |\n|---|---|\n| FR-1 | Convert |\n| FR-2 | Help |\n| FR-3 | Version |\n| SR-1 | Validate |\n| SR-2 | Escape |\n")
+writeFileSync(join(T, ".tomdlc/02-requirements.md"), "| ID | Req |\n|---|---|\n| FR-1 | Convert |\n| FR-2 | Help |\n| FR-3 | Version |\n| SR-1 | Validate |\n| SR-2 | Escape |\n")
 expect("no Must FRs flagged", JSON.parse(await script("check-trace.ts", T.replaceAll("\\", "/"), "--json")).noMustFRs, true)
 expect("text report warns", (await script("check-trace.ts", T.replaceAll("\\", "/"))).includes("WARNING: no FR is marked Must"), true)
 
 // a saved matrix that no longer matches the documents is flagged
-const TRACE_MD = join(T, "docs/sdlc/traceability.md")
+const TRACE_MD = join(T, ".tomdlc/traceability.md")
 writeFileSync(TRACE_MD, (await script("check-trace.ts", T.replaceAll("\\", "/"), "--matrix")).replace(/\n$/, "").replace(/on \d{4}-\d{2}-\d{2}/, "on 2001-01-01") + "\n")
 expect("fresh matrix (different date) isn't stale", JSON.parse(await script("check-trace.ts", T.replaceAll("\\", "/"), "--json")).matrixStale, false)
-writeFileSync(join(T, "docs/sdlc/02-requirements.md"), "| ID | Req |\n|---|---|\n| FR-1 | Convert (Must) |\n| FR-2 | Help |\n| FR-3 | Version |\n| SR-1 | Validate |\n| SR-2 | Escape |\n")
+writeFileSync(join(T, ".tomdlc/02-requirements.md"), "| ID | Req |\n|---|---|\n| FR-1 | Convert (Must) |\n| FR-2 | Help |\n| FR-3 | Version |\n| SR-1 | Validate |\n| SR-2 | Escape |\n")
 expect("matrix stale after the documents change", (await script("check-trace.ts", T.replaceAll("\\", "/"))).includes("traceability.md is out of date"), true)
 rmSync(TRACE_MD)
 
@@ -226,6 +226,44 @@ expect("secret value never printed", gl.includes("SHOULDNOTPRINT"), false)
 expect("secrets aren't auto-fixable", JSON.parse(gl).findings[0].autoFixable, false)
 const pip = JSON.parse(await script("import-findings.ts", join(SP, "scans", "pip.json")))
 expect("pip-audit fix version auto-fixable", [pip.findings[0].fixedIn, pip.findings[0].autoFixable], ["2.11.3", true])
+
+// ---- moving a legacy docs/sdlc project to .tomdlc
+{
+  const L = join(SP, "proj-legacy"), LP = L.replaceAll("\\", "/")
+  rmSync(L, { recursive: true, force: true }); mkdirSync(join(L, ".tomdlc"), { recursive: true }); mkdirSync(join(L, "docs"))
+  writeFileSync(join(L, "docs/guide.md"), "# The project's own docs\n")
+  writeFileSync(join(L, ".gitignore"), "node_modules/\ndocs/sdlc/.dispatch.json\n")
+  writeFileSync(join(L, ".tomdlc/01-plan.md"), "# Plan\n")
+  writeFileSync(join(L, ".tomdlc/00-discovery.md"), "# Discovery\n")
+  const st = (stages: any) => ({ project: "legacy", currentStage: "requirements", stages: Object.fromEntries(STAGES.map((s) => [s, stages[s] ?? { status: "not-started" }])), waivers: [], history: [], risks: [] })
+  const write = async (s: any) => {
+    writeFileSync(join(L, ".tomdlc/state.json"), JSON.stringify(s))
+    await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: LP, tool_name: "Write", tool_input: { file_path: `${LP}/.tomdlc/state.json` } })
+  }
+  await write(st({}))
+  await write(st({ plan: { status: "passed", passedAt: "2026-10-01", approval: { at: "2026-10-01", text: "ok" }, outputs: [".tomdlc/00-discovery.md"] } }))
+  // Make it look like an older version wrote it: the folder and every recorded path under docs/sdlc.
+  for (const f of [".tomdlc/.audit-state.json", ".tomdlc/state.json"])
+    writeFileSync(join(L, f), readFileSync(join(L, f), "utf8").replaceAll('".tomdlc/', '"docs/sdlc/'))
+  require("node:fs").renameSync(join(L, ".tomdlc"), join(L, "docs/sdlc"))
+
+  const ss = (await run("on-session-start.ts", { cwd: LP, source: "startup" })).hookSpecificOutput?.additionalContext ?? ""
+  expect("session start asks for the move", ss.includes("move-to-tomdlc.ts"), true)
+  expect("session start creates nothing in .tomdlc", existsSync(join(L, ".tomdlc")), false)
+  const out = await new Response(Bun.spawn([process.execPath, join(SCRIPTS, "move-to-tomdlc.ts"), L], { stdout: "pipe", stderr: "pipe" }).stdout).text()
+  expect("moved, chain intact", out.includes("chain intact"), true)
+  expect("project docs untouched", [existsSync(join(L, "docs/guide.md")), existsSync(join(L, "docs/sdlc"))], [true, false])
+  expect("outputs path rewritten", JSON.parse(readFileSync(join(L, ".tomdlc/state.json"), "utf8")).stages.plan.outputs, [".tomdlc/00-discovery.md"])
+  expect(".gitignore rewritten", readFileSync(join(L, ".gitignore"), "utf8"), "node_modules/\n.tomdlc/.dispatch.json\n")
+  const { drift } = await import(join(H, "lib", "audit.ts"))
+  expect("approved documents not reported as changed", drift(L), [])
+  expect("register views regenerated", existsSync(join(L, ".tomdlc/risks.md")), true)
+  const after = await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: LP, tool_name: "Bash", tool_input: { command: "bun move-to-tomdlc.ts" } })
+  expect("rewritten state.json matches the recorded state", after.decision ?? "allow", "allow")
+  expect("move logged", JSON.parse(readFileSync(join(L, ".tomdlc/audit.jsonl"), "utf8").trim().split("\n").at(-1)!).event, "tomdlc_folder_moved")
+  const again = Bun.spawnSync([process.execPath, join(SCRIPTS, "move-to-tomdlc.ts"), L])
+  expect("nothing left to move", again.exitCode, 1)
+}
 
 console.log(`${total} checks, ${fails} failures`)
 

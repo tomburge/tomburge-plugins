@@ -111,7 +111,7 @@ Read what your brief lists, and only what you need beyond it to check a specific
 - **Always:** the documents under review, and the documents they must agree with (the brief names them; e.g. `01-plan.md` for requirements, `02-requirements.md` and `03-threat-model.md` for design).
 - **Code mode:** the diff or the changed files and their tests, plus callers and callees of the changed code. Not the whole repository.
 - **Changes to existing projects:** the changed sections and what they directly depend on (see Fitting the scale).
-- **Never:** agent reports in `docs/sdlc/reports/`, the author's summaries, or chat transcripts. They carry the author's reasoning, which you are supposed to test, not inherit. If you need context the documents don't give, that gap is itself a finding.
+- **Never:** agent reports in `.tomdlc/reports/`, the author's summaries, or chat transcripts. They carry the author's reasoning, which you are supposed to test, not inherit. If you need context the documents don't give, that gap is itself a finding.
 - Note in your Summary anything you didn't read that a full review would need.
 
 ## Pacing

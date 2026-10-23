@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { H, SP } from "../lib/harness.ts"
 const DIR = join(SP, "proj3"), P = DIR.replaceAll("\\", "/")
 rmSync(DIR, { recursive: true, force: true })
-mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
-const AUDIT = join(DIR, "docs/sdlc/audit.jsonl"), STATE = join(DIR, "docs/sdlc/state.json")
+mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
+const AUDIT = join(DIR, ".tomdlc/audit.jsonl"), STATE = join(DIR, ".tomdlc/state.json")
 let fails = 0, total = 0
 async function run(hook: string, ev: object) {
   const p = Bun.spawn([process.execPath, join(H, hook)], { stdin: new TextEncoder().encode(JSON.stringify(ev)), stdout: "pipe" })
@@ -19,7 +19,7 @@ const events = () => (existsSync(AUDIT) ? readFileSync(AUDIT, "utf8").split("\n"
 const names = (from: number) => events().slice(from).map((e) => e.event)
 const writeState = async (s: unknown) => {
   writeFileSync(STATE, JSON.stringify(s))
-  return run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } })
+  return run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } })
 }
 const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"]
 const stages = Object.fromEntries(STAGES.map((s) => [s, { status: "not-started" }]))
@@ -75,9 +75,15 @@ expect("reviewer verdict", events().at(-1)?.verdict, "NOT READY")
 expect("summary line", events().at(-1)?.summary, "NOT READY: 1 critical, 2 high")
 
 n = events().length
-writeFileSync(join(DIR, "docs/sdlc/decisions.md"), "# Decisions\n")
-await run("audit-events.ts", { hook_event_name: "PostToolUse", cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/decisions.md` } })
-expect("decisions event", names(n), ["decisions_recorded"])
+const d1 = { id: "D-1", date: "2026-10-12", stage: "plan", question: "Which cloud?", answer: '"AWS, us-east-1"' }
+const v4 = { ...v3, baseline: { command: "npm test", recordedAt: "2026-10-12", passed: 3, failed: 0, skipped: 0, failing: [] }, decisions: [d1],
+  practices: [{ id: "RULE-1", kind: "learned", rule: "Use lib/http", why: "one retry policy", date: "2026-10-12" }] }
+await writeState(v4)
+expect("decision and practice events", names(n), ["decision_recorded", "practice_added"])
+n = events().length
+await writeState({ ...v4, decisions: [{ ...d1, answer: '"AWS, us-west-2"' }], practices: [] })
+expect("decision changed, practice removed", names(n), ["decision_changed", "practice_removed"])
+await writeState(v4)
 
 n = events().length
 const pg = await run("prod-guard.ts", { cwd: P, tool_name: "Bash", tool_input: { command: "terraform apply -auto-approve" } })
@@ -100,29 +106,29 @@ writeFileSync(AUDIT, all.join("\n") + "\n")
 // concurrent writers (parallel agents, several hooks per event) must not break the chain
 {
   const CON = join(SP, "proj-concurrent")
-  mkdirSync(join(CON, "docs/sdlc"), { recursive: true })
+  mkdirSync(join(CON, ".tomdlc"), { recursive: true })
   const conP = CON.replaceAll("\\", "/")
   const procs = Array.from({ length: 24 }, (_, i) =>
     Bun.spawn([process.execPath, join(H, "audit-prompt.ts")], { stdin: new TextEncoder().encode(JSON.stringify({ cwd: conP, prompt: `prompt ${i}` })), stdout: "pipe" }),
   )
   await Promise.all(procs.map((p) => p.exited))
-  const conLines = readFileSync(join(CON, "docs/sdlc/audit.jsonl"), "utf8").split("\n").filter(Boolean)
+  const conLines = readFileSync(join(CON, ".tomdlc/audit.jsonl"), "utf8").split("\n").filter(Boolean)
   expect("all concurrent events written", conLines.length, 24)
   const { verifyAudit } = await import(join(H, "lib", "audit.ts"))
   expect("chain intact after concurrent writes", verifyAudit(CON).problem, null)
-  expect("lock released", existsSync(join(CON, "docs/sdlc/.audit.lock")), false)
+  expect("lock released", existsSync(join(CON, ".tomdlc/.audit.lock")), false)
 }
 
 // protections
 const og = (ev: object, tool: string, input: object) =>
   run("ownership-guard.ts", { cwd: P, ...ev, tool_name: tool, tool_input: input }).then((o) => o.hookSpecificOutput?.permissionDecision ?? "allow")
 const AG = { agent_id: "a1", agent_type: "tomdlc:developer" }
-expect("main Write audit denied", await og({}, "Write", { file_path: `${P}/docs/sdlc/audit.jsonl` }), "deny")
-expect("main Edit snapshot denied", await og({}, "Edit", { file_path: `${P}/docs/sdlc/.audit-state.json` }), "deny")
-expect("main shell append denied", await og({}, "Bash", { command: "echo x >> docs/sdlc/audit.jsonl" }), "deny")
-expect("main shell sed denied", await og({}, "Bash", { command: "sed -i 1d docs/sdlc/audit.jsonl" }), "deny")
-expect("main shell read allowed", await og({}, "Bash", { command: "cat docs/sdlc/audit.jsonl" }), "allow")
-expect("main git add allowed", await og({}, "Bash", { command: "git add docs/sdlc/audit.jsonl" }), "allow")
+expect("main Write audit denied", await og({}, "Write", { file_path: `${P}/.tomdlc/audit.jsonl` }), "deny")
+expect("main Edit snapshot denied", await og({}, "Edit", { file_path: `${P}/.tomdlc/.audit-state.json` }), "deny")
+expect("main shell append denied", await og({}, "Bash", { command: "echo x >> .tomdlc/audit.jsonl" }), "deny")
+expect("main shell sed denied", await og({}, "Bash", { command: "sed -i 1d .tomdlc/audit.jsonl" }), "deny")
+expect("main shell read allowed", await og({}, "Bash", { command: "cat .tomdlc/audit.jsonl" }), "allow")
+expect("main git add allowed", await og({}, "Bash", { command: "git add .tomdlc/audit.jsonl" }), "allow")
 
 // Bash has no NUL device: redirecting to it creates a file named NUL
 for (const c of ["bun test 2>nul", "ls > NUL", "cmd &>nul", "x 2>> nul; echo ok"])
@@ -130,17 +136,22 @@ for (const c of ["bun test 2>nul", "ls > NUL", "cmd &>nul", "x 2>> nul; echo ok"
 for (const c of ["bun test 2>/dev/null", "echo nul > out.txt", "cat null.txt", "grep -r nullable src"])
   expect(`bash without a NUL redirect allowed: ${c}`, await og({}, "Bash", { command: c }), "allow")
 expect("PowerShell NUL not judged by the Bash rule", await og({}, "PowerShell", { command: "bun test 2>$null" }), "allow")
-expect("agent audit denied", await og(AG, "Write", { file_path: `${P}/docs/sdlc/audit.jsonl` }), "deny")
-expect("agent decisions denied", await og(AG, "Write", { file_path: `${P}/docs/sdlc/decisions.md` }), "deny")
-expect("main decisions allowed", await og({}, "Write", { file_path: `${P}/docs/sdlc/decisions.md` }), "allow")
+expect("agent audit denied", await og(AG, "Write", { file_path: `${P}/.tomdlc/audit.jsonl` }), "deny")
+expect("agent decisions denied", await og(AG, "Write", { file_path: `${P}/.tomdlc/decisions.md` }), "deny")
+// Register views are generated from state.json, so nobody writes them, not even the orchestrator.
+expect("main decisions denied", await og({}, "Write", { file_path: `${P}/.tomdlc/decisions.md` }), "deny")
+expect("main Edit risks view denied", await og({}, "Edit", { file_path: `${P}/.tomdlc/risks.md` }), "deny")
+expect("main shell write to findings view denied", await og({}, "Bash", { command: "echo x >> .tomdlc/findings.md" }), "deny")
+expect("main shell read of a view allowed", await og({}, "Bash", { command: "cat .tomdlc/waivers.md" }), "allow")
+expect("agent practices.md not a generated file", await og({ agent_id: "p1", agent_type: "tomdlc:planner" }, "Write", { file_path: `${P}/.tomdlc/practices.md` }), "allow")
 
 // the main session writes state.json with Write/Edit only, so the checker and approval guard see it
-expect("main shell redirect to state denied", await og({}, "Bash", { command: "echo {} > docs/sdlc/state.json" }), "deny")
-expect("main Set-Content on dispatch denied", await og({}, "PowerShell", { command: "Set-Content docs/sdlc/.dispatch.json '{}'" }), "deny")
-expect("main inline script writing state denied", await og({}, "Bash", { command: `python -c "import json;json.dump({}, open('docs/sdlc/state.json','w'))"` }), "deny")
-expect("main shell read of state allowed", await og({}, "Bash", { command: "cat docs/sdlc/state.json 2>/dev/null" }), "allow")
-expect("main script read of state allowed", await og({}, "Bash", { command: `python -c "import json;print(json.load(open('docs/sdlc/state.json'))['currentStage'])"` }), "allow")
-expect("main git add of state allowed", await og({}, "Bash", { command: "git add docs/sdlc/state.json" }), "allow")
+expect("main shell redirect to state denied", await og({}, "Bash", { command: "echo {} > .tomdlc/state.json" }), "deny")
+expect("main Set-Content on dispatch denied", await og({}, "PowerShell", { command: "Set-Content .tomdlc/.dispatch.json '{}'" }), "deny")
+expect("main inline script writing state denied", await og({}, "Bash", { command: `python -c "import json;json.dump({}, open('.tomdlc/state.json','w'))"` }), "deny")
+expect("main shell read of state allowed", await og({}, "Bash", { command: "cat .tomdlc/state.json 2>/dev/null" }), "allow")
+expect("main script read of state allowed", await og({}, "Bash", { command: `python -c "import json;print(json.load(open('.tomdlc/state.json'))['currentStage'])"` }), "allow")
+expect("main git add of state allowed", await og({}, "Bash", { command: "git add .tomdlc/state.json" }), "allow")
 
 // a script that rewrote state.json without showing it is caught after the command
 {
@@ -158,15 +169,15 @@ expect("main git add of state allowed", await og({}, "Bash", { command: "git add
 }
 
 // questions-mode dispatch entry blocks all writes
-writeFileSync(join(DIR, "docs/sdlc/.dispatch.json"), JSON.stringify({ agents: { planner: { stage: "plan", owns: ["<none>"] } } }))
-expect("questions mode write denied", await og({ agent_id: "a2", agent_type: "tomdlc:planner" }, "Write", { file_path: `${P}/docs/sdlc/01-plan.md` }), "deny")
-const vd = await run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/.dispatch.json` } })
+writeFileSync(join(DIR, ".tomdlc/.dispatch.json"), JSON.stringify({ agents: { planner: { stage: "plan", owns: ["<none>"] } } }))
+expect("questions mode write denied", await og({ agent_id: "a2", agent_type: "tomdlc:planner" }, "Write", { file_path: `${P}/.tomdlc/01-plan.md` }), "deny")
+const vd = await run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/.dispatch.json` } })
 expect("<none> dispatch entry valid", vd.decision ?? "allow", "allow")
-rmSync(join(DIR, "docs/sdlc/.dispatch.json"))
+rmSync(join(DIR, ".tomdlc/.dispatch.json"))
 
 // rotation: the live log moves to an archive segment, the chain continues, archives are protected
 {
-  const RD = join(SP, "proj-rotate"); mkdirSync(join(RD, "docs/sdlc"), { recursive: true })
+  const RD = join(SP, "proj-rotate"); mkdirSync(join(RD, ".tomdlc"), { recursive: true })
   const RP = RD.replaceAll("\\", "/")
   const rotEnv = { ...process.env, TOMDLC_AUDIT_ROTATE_LINES: "5" }
   const promptR = async (text: string) => {
@@ -176,14 +187,14 @@ rmSync(join(DIR, "docs/sdlc/.dispatch.json"))
   for (let i = 1; i <= 12; i++) await promptR(`prompt ${i}`)
   const { verifyAudit, readAudit, readSnapshot } = await import(join(H, "lib", "audit.ts"))
   const snap = readSnapshot(RD)
-  expect("two segments archived", snap.segments.map((s: any) => [s.file, s.entries]), [["docs/sdlc/audit-archive/audit-0001.jsonl", 5], ["docs/sdlc/audit-archive/audit-0002.jsonl", 5]])
-  const live = readFileSync(join(RD, "docs/sdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
-  expect("live log starts with log_rotated", [live[0].event, live[0].archived], ["log_rotated", "docs/sdlc/audit-archive/audit-0002.jsonl"])
+  expect("two segments archived", snap.segments.map((s: any) => [s.file, s.entries]), [[".tomdlc/audit-archive/audit-0001.jsonl", 5], [".tomdlc/audit-archive/audit-0002.jsonl", 5]])
+  const live = readFileSync(join(RD, ".tomdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+  expect("live log starts with log_rotated", [live[0].event, live[0].archived], ["log_rotated", ".tomdlc/audit-archive/audit-0002.jsonl"])
   expect("chain intact across segments", verifyAudit(RD).problem, null)
   const all = readAudit(RD)
   expect("reading spans every segment", [all.filter((e: any) => e.event === "user_prompt").length, all.filter((e: any) => e.event === "log_rotated").length], [12, 2])
   expect("archived events stay visible to the guards", all.some((e: any) => e.event === "user_prompt" && e.text === "prompt 1"), true)
-  const seg1 = join(RD, "docs/sdlc/audit-archive/audit-0001.jsonl")
+  const seg1 = join(RD, ".tomdlc/audit-archive/audit-0001.jsonl")
   const original = readFileSync(seg1, "utf8")
   writeFileSync(seg1, original.replace("prompt 1", "prompt X"))
   expect("an edited archive is detected", String(verifyAudit(RD).problem).includes("audit-0001.jsonl was changed"), true)
@@ -192,15 +203,15 @@ rmSync(join(DIR, "docs/sdlc/.dispatch.json"))
   writeFileSync(seg1, original)
   expect("restored archive verifies", verifyAudit(RD).problem, null)
   const ogR = (input: object, tool = "Write") => run("ownership-guard.ts", { cwd: RP, tool_name: tool, tool_input: input }).then((o) => o.hookSpecificOutput?.permissionDecision ?? "allow")
-  expect("archive write denied", await ogR({ file_path: `${RP}/docs/sdlc/audit-archive/audit-0001.jsonl` }), "deny")
-  expect("archive shell delete denied", await ogR({ command: "rm docs/sdlc/audit-archive/audit-0001.jsonl" }, "Bash"), "deny")
+  expect("archive write denied", await ogR({ file_path: `${RP}/.tomdlc/audit-archive/audit-0001.jsonl` }), "deny")
+  expect("archive shell delete denied", await ogR({ command: "rm .tomdlc/audit-archive/audit-0001.jsonl" }, "Bash"), "deny")
 }
 
 // non-TomDLC project: nothing written
 const OTHER = join(SP, "plain-proj")
 rmSync(OTHER, { recursive: true, force: true }); mkdirSync(OTHER)
 await run("audit-events.ts", { hook_event_name: "SubagentStart", cwd: OTHER.replaceAll("\\", "/"), agent_id: "x", agent_type: "Explore" })
-expect("no audit outside TomDLC projects", existsSync(join(OTHER, "docs")), false)
+expect("no audit outside TomDLC projects", existsSync(join(OTHER, ".tomdlc")), false)
 
 console.log(`${total} checks, ${fails} failures`)
 

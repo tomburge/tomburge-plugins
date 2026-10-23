@@ -12,7 +12,7 @@ The shared TomDLC agent rules are added at the start of your context; follow the
 - You're read-only. The orchestrator routes your findings to the agents that fix them, so name the owner you'd suggest for each finding.
 
 ## Context first
-Read `docs/sdlc/03-threat-model.md` and the `SR-n` items in `docs/sdlc/02-requirements.md`. A change that breaks a documented mitigation is high priority, even if the code looks fine in isolation.
+Read `.tomdlc/03-threat-model.md` and the `SR-n` items in `.tomdlc/02-requirements.md`. A change that breaks a documented mitigation is high priority, even if the code looks fine in isolation.
 
 ## Design review mode (SSDF PW.2)
 Check `03-design.md` and `03-threat-model.md`:

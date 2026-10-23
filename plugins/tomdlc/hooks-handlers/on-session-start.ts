@@ -11,7 +11,16 @@ import { appendAudit, drift, verifyAudit } from "./lib/audit.ts"
 const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"]
 
 function context(cwd: string, source?: string): string | null {
-  const statePath = join(cwd, "docs", "sdlc", "state.json")
+  const statePath = join(cwd, ".tomdlc", "state.json")
+  // Older versions kept everything in docs/sdlc/, mixed in with the project's own documentation.
+  // Until it's moved, the hooks don't see the project as a TomDLC one.
+  if (!existsSync(statePath) && existsSync(join(cwd, "docs", "sdlc", "state.json")))
+    return (
+      "TomDLC: this project keeps its TomDLC files in docs/sdlc/, which this version of the plugin no longer reads: they now live in .tomdlc/, " +
+      "so they don't mix with the project's documentation. Until they're moved, the guards, the state checker and the audit log are off for this project. " +
+      `Before any other TomDLC work, tell the user and, with their agreement, run \`bun "${join(import.meta.dir, "..", "scripts", "move-to-tomdlc.ts").replaceAll("\\", "/")}"\` from the project root. ` +
+      "It moves the folder and updates the paths the audit snapshot, state.json and .gitignore record, so approvals and the audit chain stay valid. Then suggest committing the move."
+    )
   if (!existsSync(statePath)) return null
 
   const state = JSON.parse(readFileSync(statePath, "utf8"))
@@ -25,7 +34,7 @@ function context(cwd: string, source?: string): string | null {
   const slices: { id: string; status: string }[] = state.stages?.develop?.slices ?? []
   const lines = [
     ...(source === "compact"
-      ? ["TomDLC: the conversation was just compacted. Before continuing, re-read docs/sdlc/state.json and decisions.md (and only the stage-document sections the next step needs); trust them over the compacted summary. Then carry on with the next action without asking the user to start a new session or repeat anything."]
+      ? ["TomDLC: the conversation was just compacted. Before continuing, re-read .tomdlc/state.json and decisions.md (and only the stage-document sections the next step needs); trust them over the compacted summary. Then carry on with the next action without asking the user to start a new session or repeat anything."]
       : []),
     `TomDLC: project "${state.project ?? "unnamed"}" is in stage ${STAGES.indexOf(current) + 1}/7 (${current}).`,
     change ? `Active change: ${change.id} (${change.shape}): ${change.title}.` : "No active change recorded.",
@@ -55,7 +64,7 @@ function context(cwd: string, source?: string): string | null {
             ". Develop deploys only to dev; stage and prod need a promotion the user approves with the single word \"Approve\".",
         ]
       : []),
-    `Stage outputs live in docs/sdlc/. Continue with /tomdlc, the orchestrator that dispatches the stage agents.`,
+    `Stage outputs live in .tomdlc/. Continue with /tomdlc, the orchestrator that dispatches the stage agents.`,
   ]
   if (slices.length > 0) lines.push(`Develop slices: ${slices.map((s) => `${s.id}=${s.status}`).join(", ")}.`)
   if (state.baseline) {
@@ -80,7 +89,7 @@ function context(cwd: string, source?: string): string | null {
   }
 
   try {
-    const dispatchPath = join(cwd, "docs", "sdlc", ".dispatch.json")
+    const dispatchPath = join(cwd, ".tomdlc", ".dispatch.json")
     const leftover = existsSync(dispatchPath) ? Object.keys(JSON.parse(readFileSync(dispatchPath, "utf8")).agents ?? {}) : []
     if (leftover.length > 0)
       lines.push(`.dispatch.json still lists ${leftover.join(", ")}: a session likely ended mid-dispatch. Check what they left behind before re-dispatching.`)
@@ -106,7 +115,7 @@ function context(cwd: string, source?: string): string | null {
   const audit = verifyAudit(cwd)
   lines.push(
     audit.problem
-      ? `WARNING: the audit log docs/sdlc/audit.jsonl failed its integrity check: ${audit.problem}. Tell the user; don't try to repair it.`
+      ? `WARNING: the audit log .tomdlc/audit.jsonl failed its integrity check: ${audit.problem}. Tell the user; don't try to repair it.`
       : `Audit log: ${audit.entries} entries, chain intact.`,
   )
   return lines.join("\n")
@@ -116,9 +125,9 @@ const event = JSON.parse(await new Response(Bun.stdin.stream()).text())
 let additionalContext: string | null = null
 try {
   additionalContext = context(event.cwd ?? process.cwd(), event.source)
-  if (additionalContext) appendAudit(event.cwd ?? process.cwd(), "session_started", "user", { source: event.source })
+  if (additionalContext && existsSync(join(event.cwd ?? process.cwd(), ".tomdlc"))) appendAudit(event.cwd ?? process.cwd(), "session_started", "user", { source: event.source })
 } catch (err) {
-  additionalContext = `TomDLC: docs/sdlc/state.json exists but could not be read (${err}). Offer to repair it with /tomdlc.`
+  additionalContext = `TomDLC: .tomdlc/state.json exists but could not be read (${err}). Offer to repair it with /tomdlc.`
 }
 
 process.stdout.write(

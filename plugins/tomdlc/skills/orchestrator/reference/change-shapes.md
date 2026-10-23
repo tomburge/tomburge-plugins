@@ -55,4 +55,4 @@ Record the approved plan in `state.json` under `change` (see the orchestrator sk
 
 ## Saved plans
 
-When the user tailors a plan they'll want again (e.g. "dependency bumps: Develop light, Test light, Deploy light, nothing else"), offer to save it in `practices.md` under **Stage plan presets**, with a name, the shape it applies to, each stage's action and reason, and when it doesn't apply. When sizing a later change, offer a matching preset as the starting proposal. It's still shown and approved like any plan, and the escalation rules still apply.
+When the user tailors a plan they'll want again (e.g. "dependency bumps: Develop light, Test light, Deploy light, nothing else"), offer to save it as a preset in the `practices` register (`kind: "preset"`, with a `name`, the `shape` it applies to, and in `rule` each stage's action and reason, and when it doesn't apply). It appears in `practices.md` under **Stage plan presets**. When sizing a later change, offer a matching preset as the starting proposal. It's still shown and approved like any plan, and the escalation rules still apply.

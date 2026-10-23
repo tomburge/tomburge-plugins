@@ -3,7 +3,7 @@
 //
 //   bun check-trace.ts <project-root> [--tests <dir> ...] [--json | --matrix]
 //
-// Reads docs/sdlc/*.md and the test files, then reports:
+// Reads .tomdlc/*.md and the test files, then reports:
 //  - undefined: IDs referenced somewhere but never defined in their home document
 //  - duplicates: IDs defined more than once
 //  - Must FRs the design doesn't mention, or that no delivery slice delivers
@@ -12,7 +12,7 @@
 // Home documents: FR, NFR, SR, AC in 02-requirements.md; T in
 // 03-threat-model.md; S, BR, ADR in 03-design.md (and 03-functional-design.md).
 // With --matrix, prints an end-to-end traceability table instead (requirement →
-// design → slices → tests → test report) for docs/sdlc/traceability.md.
+// design → slices → tests → test report) for .tomdlc/traceability.md.
 // Prints a readable report (or JSON with --json). Always exits 0: it informs
 // the gate; it doesn't decide it.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
@@ -23,7 +23,7 @@ const root = args.find((a) => !a.startsWith("--")) ?? "."
 const asJson = args.includes("--json")
 const testDirs = args.flatMap((a, i) => (args[i - 1] === "--tests" ? [a] : []))
 
-const SDLC = join(root, "docs", "sdlc")
+const SDLC = join(root, ".tomdlc")
 // "AC-10.3" is acceptance criterion 3 of FR-10, not abuse case AC-10, so an ID followed by ".<digit>" is skipped.
 const ID = /\b(FR|NFR|SR|AC|BR|ADR|T|S)-(\d+[a-z]?)\b(?!\.\d)/g
 const HOME: Record<string, string[]> = {
@@ -195,6 +195,6 @@ if (args.includes("--matrix")) {
   if (result.noMustFRs)
     out.push("- WARNING: no FR is marked Must, so the Must checks above checked nothing. Mark each FR's priority (Must, Should, Could) on its definition line in 02-requirements.md.")
   if (matrixStale)
-    out.push("- WARNING: docs/sdlc/traceability.md is out of date. Regenerate it with --matrix before using it at the gate.")
+    out.push("- WARNING: .tomdlc/traceability.md is out of date. Regenerate it with --matrix before using it at the gate.")
   console.log(out.join("\n"))
 }

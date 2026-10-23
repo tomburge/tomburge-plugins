@@ -13,9 +13,9 @@ function expect(name: string, got: unknown, want: unknown) {
   if (JSON.stringify(got) !== JSON.stringify(want)) { fails++; console.log(`FAIL ${name}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`) }
 }
 const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"]
-writeFileSync(join(SP, "proj2/docs/sdlc/00-codebase.md"), "# Codebase\n") // an existing-code project
-const write = (s: unknown) => writeFileSync(join(SP, "proj2/docs/sdlc/state.json"), JSON.stringify(s))
-const vs = async (s: unknown) => { write(s); return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/docs/sdlc/state.json` } }) }
+writeFileSync(join(SP, "proj2/.tomdlc/00-codebase.md"), "# Codebase\n") // an existing-code project
+const write = (s: unknown) => writeFileSync(join(SP, "proj2/.tomdlc/state.json"), JSON.stringify(s))
+const vs = async (s: unknown) => { write(s); return run("validate-state.ts", { cwd: P, tool_name: "Write", tool_input: { file_path: `${P}/.tomdlc/state.json` } }) }
 const dec = (o: any) => o.decision ?? "allow"
 
 const plan = {

@@ -1,5 +1,5 @@
 // Append-only, hash-chained audit log for TomDLC projects.
-// Each line of docs/sdlc/audit.jsonl records the SHA-256 of the line before it
+// Each line of .tomdlc/audit.jsonl records the SHA-256 of the line before it
 // in `prev`, so editing or deleting any line breaks the chain. The snapshot
 // file remembers the entry count and last hash, which also catches the tail
 // being truncated. Only hooks write these files; the ownership guard blocks
@@ -10,7 +10,7 @@
 // so later changes to approved or reviewed documents can be detected.
 //
 // Rotation: once the live log reaches TOMDLC_AUDIT_ROTATE_LINES entries (default
-// 20,000), it moves to docs/sdlc/audit-archive/audit-NNNN.jsonl and a new live log
+// 20,000), it moves to .tomdlc/audit-archive/audit-NNNN.jsonl and a new live log
 // starts with a log_rotated entry chained to the archive's last line, so the chain
 // runs unbroken across segments. The snapshot records each segment's entry count,
 // last hash and file hash, so an edited or deleted archive is detected. Reading and
@@ -55,7 +55,7 @@ export interface AuditEntry {
   [key: string]: unknown
 }
 
-export const isTomdlcProject = (root: string) => existsSync(join(root, "docs", "sdlc"))
+export const isTomdlcProject = (root: string) => existsSync(join(root, ".tomdlc"))
 
 const fileLines = (path: string): string[] => (existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean) : [])
 
@@ -209,12 +209,12 @@ export function verifyAudit(root: string): { entries: number; problem: string | 
 
 /** Documents each stage's approval covers. Living documents (practices, decisions, operations) are left out. */
 const STAGE_DOCS: Record<string, string[]> = {
-  plan: ["docs/sdlc/01-plan.md"],
-  requirements: ["docs/sdlc/02-requirements.md"],
-  design: ["docs/sdlc/03-design.md", "docs/sdlc/03-ux.md", "docs/sdlc/03-threat-model.md", "docs/sdlc/03-platform.md"],
-  develop: ["docs/sdlc/04-develop.md"],
-  test: ["docs/sdlc/05-test-report.md"],
-  deploy: ["docs/sdlc/06-release.md", "docs/sdlc/06-infra.md"],
+  plan: [".tomdlc/01-plan.md"],
+  requirements: [".tomdlc/02-requirements.md"],
+  design: [".tomdlc/03-design.md", ".tomdlc/03-ux.md", ".tomdlc/03-threat-model.md", ".tomdlc/03-platform.md"],
+  develop: [".tomdlc/04-develop.md"],
+  test: [".tomdlc/05-test-report.md"],
+  deploy: [".tomdlc/06-release.md", ".tomdlc/06-infra.md"],
 }
 
 /** The stage's default documents plus any extra paths listed in `stages.<stage>.outputs`. */

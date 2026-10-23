@@ -47,8 +47,8 @@ Projects add their own material without editing the plugin:
 
 | Location | Contents | Who writes it |
 |---|---|---|
-| `docs/sdlc/practices.md` | Team practices: code style, testing approach, branching, deployment cadence, Mandated, Forbidden and Learned rules. Template: `../templates/practices.md` | Drafted by the planner; learned rules are added by the orchestrator with the user's consent |
-| `docs/sdlc/standards/shared/*.md` | Standards every agent follows (e.g. mandated tools, forbidden libraries) | The user or the team |
-| `docs/sdlc/standards/<agent>/*.md` | Additions for one agent (e.g. `requirements-analyst/edge-cases.md` with project-specific conditions) | The user or the team, or an agent the orchestrator assigns |
+| `.tomdlc/practices.md` | Team practices: code style, testing approach, branching, deployment cadence, Mandated, Forbidden and Learned rules. Template: `../templates/practices.md` | Prose drafted by the planner; the rule sections are generated from the `practices` register in `state.json`, which the orchestrator adds to with the user's consent |
+| `.tomdlc/standards/shared/*.md` | Standards every agent follows (e.g. mandated tools, forbidden libraries) | The user or the team |
+| `.tomdlc/standards/<agent>/*.md` | Additions for one agent (e.g. `requirements-analyst/edge-cases.md` with project-specific conditions) | The user or the team, or an agent the orchestrator assigns |
 
 When a project file conflicts with a plugin knowledge file, the project file wins.

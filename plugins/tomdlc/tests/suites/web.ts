@@ -16,7 +16,7 @@ function expect(name: string, got: unknown, want: unknown) {
 const dec = (o: any) => o.hookSpecificOutput?.permissionDecision ?? "allow"
 
 const DIR = join(SP, "webproj")
-mkdirSync(join(DIR, "docs/sdlc"), { recursive: true })
+mkdirSync(join(DIR, ".tomdlc"), { recursive: true })
 const P = DIR.replaceAll("\\", "/")
 const AG = { cwd: P, agent_id: "p1", agent_type: "tomdlc:planner" }
 const fetch = (url: string, ev: object = AG) => run("web-guard.ts", { ...ev, tool_name: "WebFetch", tool_input: { url, prompt: "summarize" } }).then(dec)
@@ -43,7 +43,7 @@ expect("main session may fetch an internal page", await fetch("http://wiki.corp.
 expect("public host that only looks private", await fetch("https://10.example.com/"), "allow")
 
 // research is audited
-const log = readFileSync(join(DIR, "docs/sdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+const log = readFileSync(join(DIR, ".tomdlc/audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
 const research = log.filter((e) => e.event === "web_research")
 expect("allowed queries and fetches logged", research.length, 5)
 expect("logged with the agent", research[0].actor, "tomdlc:planner")
@@ -54,7 +54,7 @@ expect("denied requests not logged as research", research.some((e) => String(e.u
 const PLAIN = join(SP, "plainweb")
 mkdirSync(PLAIN, { recursive: true })
 await search("anything", { cwd: PLAIN.replaceAll("\\", "/") })
-expect("no audit outside TomDLC projects", existsSync(join(PLAIN, "docs")), false)
+expect("no audit outside TomDLC projects", existsSync(join(PLAIN, ".tomdlc")), false)
 
 console.log(`${total} checks, ${fails} failures`)
 process.exitCode = fails > 0 ? 1 : 0

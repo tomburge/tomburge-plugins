@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 // Audit hook for SubagentStart, SubagentStop and PostToolUse (Write/Edit/
-// MultiEdit). Appends events to docs/sdlc/audit.jsonl in TomDLC projects:
+// MultiEdit). Appends events to .tomdlc/audit.jsonl in TomDLC projects:
 //  - agent_dispatched / agent_stopped for every subagent
-//  - decisions_recorded when docs/sdlc/decisions.md is written
 //  - for each write to state.json, events derived from what changed: changes
 //    approved and archived, stage and slice status changes (with the user's
-//    approval text), waivers, findings and their decisions, the baseline, and
-//    settings. Rewriting earlier `history` entries is logged and reported back.
+//    approval text), waivers, findings and their decisions, recorded decisions,
+//    practice rules, the baseline, and settings. Rewriting earlier `history` entries is logged and reported back.
 //  - fingerprints of a stage's documents when its gate is approved (or
 //    re-approved) and when the reviewer returns READY; later writes to a
 //    fingerprinted document are logged and reported as needing re-approval.
@@ -14,12 +13,12 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { join, resolve } from "node:path"
 import { appendAudit, drift, fingerprint, readAudit, sha256, isTomdlcProject, readSnapshot, rememberState, setFingerprint, stageDocs } from "./lib/audit.ts"
 import { envNames, sharedAccounts } from "./lib/environments.ts"
-import { DECISIONS_FILE, REPORTS_DIR, STAGES, STATE_FILE, dispatchKey, filePathOf, finalReport, projectPath, projectRoot, readEvent, respond, samePath, workRoot } from "./lib/hook.ts"
+import { REPORTS_DIR, STAGES, STATE_FILE, dispatchKey, filePathOf, finalReport, projectPath, projectRoot, readEvent, respond, samePath, workRoot } from "./lib/hook.ts"
 
 type Obj = Record<string, any>
 
 // Generated, vendored and hook-owned paths aren't worth an audit line per write.
-const SKIP_ARTIFACTS = /(^|\/)(node_modules|\.git|dist|build|vendor|\.venv|venv|__pycache__|coverage)\/|^docs\/sdlc\/(audit\.jsonl|\.audit-state\.json|reports\/)/i
+const SKIP_ARTIFACTS = /(^|\/)(node_modules|\.git|dist|build|vendor|\.venv|venv|__pycache__|coverage)\/|^\.tomdlc\/(audit\.jsonl|\.audit-state\.json|reports\/)/i
 type Ev = [event: string, data: Obj]
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
@@ -127,6 +126,22 @@ function diffState(prev: Obj | undefined, next: Obj): Ev[] {
     if (!old || old.status !== x.status) out.push(["spike_status_changed", { id, from: old?.status, to: x.status, outcome: x.outcome, decision: x.decision }])
   }
 
+  const prevDecisions = byId(prev.decisions)
+  for (const [id, d] of byId(next.decisions)) {
+    const old = prevDecisions.get(id)
+    if (!old) out.push(["decision_recorded", { id, stage: d.stage, change: d.change, question: d.question, answer: d.answer, default: d.default }])
+    else if (!same(old, d)) out.push(["decision_changed", { id, from: old.answer, to: d.answer }])
+  }
+
+  const prevPractices = byId(prev.practices)
+  const nextPractices = byId(next.practices)
+  for (const [id, r] of nextPractices) {
+    const old = prevPractices.get(id)
+    if (!old) out.push(["practice_added", { id, kind: r.kind, rule: r.rule, why: r.why }])
+    else if (!same(old, r)) out.push(["practice_changed", { id, from: old.rule, to: r.rule }])
+  }
+  for (const [id, r] of prevPractices) if (!nextPractices.has(id)) out.push(["practice_removed", { id, kind: r.kind, rule: r.rule }])
+
   const dep = next.stages?.deploy?.deployment
   if (dep && !same(prev.stages?.deploy?.deployment, dep)) out.push(["deployment_recorded", { ...dep }])
 
@@ -228,13 +243,10 @@ if (!isTomdlcProject(root)) {
     respond({
       decision: "block",
       reason:
-        "TomDLC: docs/sdlc/state.json was changed by a shell command or script, which skips the state checker and the approval guard. " +
+        "TomDLC: .tomdlc/state.json was changed by a shell command or script, which skips the state checker and the approval guard. " +
         "Make state changes with the Write or Edit tool only. Re-apply this change with Edit (the approval guard checks it against the last recorded state); " +
-        "if the change was a mistake, restore the file. This has been recorded in docs/sdlc/audit.jsonl.",
+        "if the change was a mistake, restore the file. This has been recorded in .tomdlc/audit.jsonl.",
     })
-  } else if (rel && samePath(rel, DECISIONS_FILE)) {
-    appendAudit(root, "decisions_recorded", actor, { file: DECISIONS_FILE })
-    respond()
   } else if (rel && samePath(rel, STATE_FILE) && existsSync(join(root, STATE_FILE))) {
     let next: Obj | null = null
     try {
@@ -264,7 +276,7 @@ if (!isTomdlcProject(root)) {
         respond({
           decision: "block",
           reason:
-            "TomDLC audit: earlier `history` entries in state.json were changed or removed. History is append-only: restore the earlier entries and only add new ones. The rewrite has been recorded in docs/sdlc/audit.jsonl.",
+            "TomDLC audit: earlier `history` entries in state.json were changed or removed. History is append-only: restore the earlier entries and only add new ones. The rewrite has been recorded in .tomdlc/audit.jsonl.",
         })
       } else {
         respond()

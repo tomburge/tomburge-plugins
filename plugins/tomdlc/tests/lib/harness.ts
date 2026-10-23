@@ -17,7 +17,7 @@ export const SCRIPTS = join(ROOT, "scripts")
 export const SP = mkdtempSync(join(tmpdir(), "tomdlc-test-"))
 
 // proj2: a small project several suites share.
-mkdirSync(join(SP, "proj2", "docs", "sdlc"), { recursive: true })
+mkdirSync(join(SP, "proj2", ".tomdlc"), { recursive: true })
 mkdirSync(join(SP, "proj2", "src"), { recursive: true })
 writeFileSync(join(SP, "proj2", "src", "app.py"), "x = 1\n")
 writeFileSync(join(SP, "proj2", "README.md"), "# notes\n")

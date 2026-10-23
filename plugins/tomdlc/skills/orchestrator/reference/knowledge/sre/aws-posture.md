@@ -1,6 +1,6 @@
 # AWS security posture (Maintain)
 
-In Maintain, check the live AWS accounts against the design and the tier, using read-only calls. Record results in `docs/sdlc/07-operations.md` and report each issue as a finding.
+In Maintain, check the live AWS accounts against the design and the tier, using read-only calls. Record results in `.tomdlc/07-operations.md` and report each issue as a finding.
 
 ## Sources
 

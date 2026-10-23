@@ -12,7 +12,7 @@ import { filePathOf, projectPath, projectRoot, readEvent, respond } from "./lib/
 
 const CODE =
   /\.(js|jsx|ts|tsx|mjs|cjs|py|go|java|kt|kts|rb|php|cs|c|cc|cpp|h|hpp|rs|swift|scala|sh|bash|ps1|tf|hcl|ya?ml|json|tpl)$/i
-const SKIP = /(^|\/)(node_modules|\.git|vendor|dist|build|docs\/sdlc)\//
+const SKIP = /(^|\/)(node_modules|\.git|vendor|dist|build|\.tomdlc)\//
 const MAX_BYTES = 1_000_000
 const MAX_FINDINGS = 15
 

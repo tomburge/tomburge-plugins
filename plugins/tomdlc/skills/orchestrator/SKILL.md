@@ -1,6 +1,6 @@
 ---
 name: tomdlc
-description: The TomDLC orchestrator, and the single entry point for the secure delivery lifecycle. Use when the user wants to start or continue a project with TomDLC, run any SDLC stage (plan, requirements, design, develop, test, deploy, maintain), make a change (feature, bugfix, security patch, refactor, infra change, incident fix), asks "where are we", "what's next", "threat model this", "set up CI with security scans", "are we ready to release", "handle this incident", or wants SDLC, DevOps, DevSecOps or Secure SDLC work done. Accepts an optional stage name as an argument. Sizes the workflow to the change, dispatches the stage agents, reviews their work, runs the stage gates and keeps docs/sdlc/state.json.
+description: The TomDLC orchestrator, and the single entry point for the secure delivery lifecycle. Use when the user wants to start or continue a project with TomDLC, run any SDLC stage (plan, requirements, design, develop, test, deploy, maintain), make a change (feature, bugfix, security patch, refactor, infra change, incident fix), asks "where are we", "what's next", "threat model this", "set up CI with security scans", "are we ready to release", "handle this incident", or wants SDLC, DevOps, DevSecOps or Secure SDLC work done. Accepts an optional stage name as an argument. Sizes the workflow to the change, dispatches the stage agents, reviews their work, runs the stage gates and keeps .tomdlc/state.json.
 ---
 
 # TomDLC orchestrator
@@ -13,7 +13,7 @@ You are the orchestrator. You run in the main session and manage the lifecycle. 
 |---|---|
 | Creates agents (the Agent tool) | Produce stage outputs (docs, code, config, tests) |
 | Talks to the user, asks questions, gets approvals | Report results, questions and handoffs back to you |
-| Writes `docs/sdlc/state.json`, `docs/sdlc/.dispatch.json` and `docs/sdlc/decisions.md` | Never create agents, never write those files |
+| Writes `.tomdlc/state.json` (including its registers) and `.tomdlc/.dispatch.json` | Never create agents, never write those files |
 | Classifies each change and proposes which stages run | Work within the stage action and slice they're given |
 | Records the test baseline | Compare their results against it |
 | Numbers findings and keeps the findings register | Report findings, and answer Fixed or Still applies for prior ones |
@@ -29,16 +29,17 @@ The plugin's hooks enforce these boundaries, so expect agents to report blocked 
 | Agent CLI block | everyone | Blocks launching `claude`, `copilot` or `gh copilot` from a shell |
 | Dispatch guard | you | Denies dispatching a TomDLC agent by its bare name; use `tomdlc:<agent>` |
 | Production-change guard | agents: denied; you: the user is asked to confirm | Blocks commands like `terraform apply`, `kubectl apply`, `helm upgrade`, cloud CLI changes, `git push`, publishing Deploys aimed at stage or prod (by profile or env-named var file) are denied for everyone until that promotion is approved with "Approve". |
-| Ownership guard | agents; you for shell writes to state | Blocks agents' writes to `state.json` and `.dispatch.json`, and writes outside the agent's `owns` globs. Blocks your shell writes to `state.json` and `.dispatch.json`: use Write or Edit, so the checks run |
+| Ownership guard | agents; you for shell writes to state; everyone for register views | Blocks agents' writes to `state.json` and `.dispatch.json`, and writes outside the agent's `owns` globs. Blocks your shell writes to `state.json` and `.dispatch.json`: use Write or Edit, so the checks run. Blocks everyone's writes to the generated register views (`risks.md`, `findings.md`, `waivers.md`, `spikes.md`, `promotions.md`, `decisions.md`) |
+| Register sync | everyone | After every `state.json` write, regenerates the register views in `.tomdlc/` from their registers, and the rule sections of `practices.md` from `practices`. After a write to `practices.md`, puts the rule sections back if the write changed them. See **Registers and their views** below |
 | Report check | TomDLC agents | Sends an agent back once if its result is missing a required section |
 | State validation | everyone | Reports schema errors right after `state.json` or `.dispatch.json` is written, including a change plan that runs a stage whose inputs don't exist because their producing stage is skipped, and a high-tier code change that skips Design |
-| Agent reports | TomDLC agents | Saves every agent's full final report to `docs/sdlc/reports/` (hook-only; nobody edits them) and logs its hash, so review evidence survives the session |
+| Agent reports | TomDLC agents | Saves every agent's full final report to `.tomdlc/reports/` (hook-only; nobody edits them) and logs its hash, so review evidence survives the session |
 | Artifact audit | everyone | Logs every file written with the file tools (path, tool, author, content hash) in the audit log |
 | Web guard | everyone (private addresses: agents) | Denies web queries and fetches containing secrets, and agents' fetches of local, private or internal addresses; logs every query and fetch in the audit log |
 | Secrets guard and per-file scan | everyone | Blocks obvious secrets; reports gitleaks and semgrep findings on each written file (when the tools are installed) |
 | Prompt audit | the user | Records every prompt the user submits in the audit log, with secrets redacted, so approvals can be checked against what they actually typed |
 | Approval guard | everyone (on `state.json` writes) | Denies a gate pass or re-approval, a new change plan, an accepted or rejected finding, an accepted risk, or a waiver granted or widened (more stages, a later expiry) unless the recorded words match a prompt the user submitted after the item came up. Denies passing a stage while a document approved at an earlier gate has changed since, until that stage is re-approved. At the high tier, also denies it when the stage's documents changed after the reviewer's READY. |
-| Audit log | everyone | Appends hash-chained events to `docs/sdlc/audit.jsonl`: dispatches, agent completions, every change you make to `state.json` (gates with approval text, waivers, findings, skips, the baseline), decisions recorded, production commands. Nobody can write the log or its snapshot with tools, and rewriting earlier `history` entries is rejected. After every shell command it compares `state.json` with the last recorded state; a change made by a command or script is logged as `state_changed_outside_tools` and sent back to you to redo with Edit. The approval guard judges every write against that recorded state. |
+| Audit log | everyone | Appends hash-chained events to `.tomdlc/audit.jsonl`: dispatches, agent completions, every change you make to `state.json` (gates with approval text, waivers, findings, decisions, practice rules, skips, the baseline), production commands. Nobody can write the log or its snapshot with tools, and rewriting earlier `history` entries is rejected. After every shell command it compares `state.json` with the last recorded state; a change made by a command or script is logged as `state_changed_outside_tools` and sent back to you to redo with Edit. The approval guard judges every write against that recorded state. |
 
 ## The lifecycle
 
@@ -66,13 +67,14 @@ Paths here are relative to this skill's base directory, which is shown when the 
 | `reference/change-shapes.md` | Change shapes, default stage plans, escalation rules | You, when sizing a change |
 | `reference/tuning.md` | **Scale** (small, medium, large): how many questions, review rounds and findings to present, document length, gate format; rules for converging reviews; changes to existing projects; large projects | You, at every dispatch, review loop and gate; paste the relevant rows into briefs |
 | `reference/knowledge/<agent>/*.md` and `reference/knowledge/shared/*.md` | Method detail for each agent. `reference/knowledge/README.md` says which files to pass to which agent in which mode. | Agents, via the **Reference files** line in their brief |
-| `reference/templates/practices.md` | Template for the project's `docs/sdlc/practices.md` | The planner |
+| `reference/templates/practices.md` | Template for the project's `.tomdlc/practices.md` | The planner |
 | `../../scripts/check-trace.ts` | Mechanical traceability check: undefined and duplicate IDs, Must FRs not designed or not in a slice, FRs and SRs no test mentions, threats the test report doesn't mention. Run `bun <path> <project root> [--tests <dir>]`; with `--matrix` it prints the end-to-end table (requirement → design → slices → tests → test report) | You, at each gate from Requirements on; the reviewer in code mode |
 | `../../scripts/import-findings.ts` | Normalizes a scanner report (SARIF, Semgrep, gitleaks, npm audit, pip-audit, OSV, Trivy, Sonar, Dependabot) into finding candidates. Run `bun <path> <report file>` | You, when starting from a scanner report |
+| `../../scripts/move-to-tomdlc.ts` | Moves a project's TomDLC files from `docs/sdlc/` (older versions) to `.tomdlc/`, updating the paths the audit snapshot, `state.json` and `.gitignore` record. Run `bun <path>` from the project root | You, with the user's agreement, when session start reports a `docs/sdlc/` project |
 
 ## Project state
 
-All outputs live in `docs/sdlc/` in the user's project. You alone maintain `docs/sdlc/state.json`:
+All outputs live in `.tomdlc/` in the user's project. You alone maintain `.tomdlc/state.json`:
 
 ```json
 {
@@ -138,6 +140,13 @@ All outputs live in `docs/sdlc/` in the user's project. You alone maintain `docs
     { "id": "F-1", "stage": "develop", "slice": "S-1", "source": "security-reviewer", "severity": "high",
       "summary": "Retry handler skips the idempotency check for refunds", "status": "open" }
   ],
+  "decisions": [
+    { "id": "D-1", "date": "<ISO date>", "change": "CH-2", "stage": "requirements", "question": "Should a retried refund ever reach the provider twice?",
+      "answer": "\"Never. Treat a duplicate as success.\"", "confirmed": true }
+  ],
+  "practices": [
+    { "id": "RULE-1", "kind": "learned", "rule": "Every payment call goes through lib/idempotency", "why": "F-1 recurred in two slices", "date": "2026-10-20" }
+  ],
   "resume": {
     "nextAction": "Re-dispatch the developer on S-1 to fix F-1, then re-review",
     "openQuestions": [],
@@ -162,19 +171,22 @@ All outputs live in `docs/sdlc/` in the user's project. You alone maintain `docs
 - A waiver is `{ "id": "W-n", "stage", "criterion", "reason", "owner", "expires": "YYYY-MM-DD" }`, plus an optional `"stages": [...]` listing later stages the same waiver also covers (e.g. a missing CI environment that affects Develop, Test and Deploy). Add a stage to `stages` with the user's agreement rather than creating a duplicate waiver. Waivers are project-level and outlive changes. Scanner suppressions in code must cite a waiver ID.
 - `findings` is the findings register. You assign each finding from a reviewer or tester an ID (`F-n`). `severity` is critical, high, medium or low. `preexisting: true` marks a finding about something the change didn't touch (existing projects only); such findings block only if critical. `status` is `open`, `fixed`, `waived` (with a `waiver` ID), `accepted` (risk accepted by the user, with their words in `decision`) or `rejected` (not a real issue, with the reason in `decision`). `slice` is optional.
 - `risks` is the risk register (RAID: risks, assumptions, issues and dependencies) described in `reference/knowledge/shared/risk-register.md`. An accepted risk needs the user's words in `decision`; the approval guard checks them.
+- `decisions` is the decision register: the user's answers to questions passes, discovery and spike decisions, and plan-checkpoint answers. Each is `{ "id": "D-n", "date", "change", "stage" (or `orient`), "question", "answer" }`, where `answer` is the user's words **verbatim**, or the default text with `"default": true` when they accepted a default. Add `"confirmed": true` when the user stated or accepted a fact ("assume X"). Gate approvals and finding, risk and waiver decisions stay on their own entries, not here.
+- `practices` is the rule register behind `practices.md`: `{ "id": "RULE-n", "kind": "mandated" | "forbidden" | "preset" | "learned", "rule", "date": "YYYY-MM-DD" }`, plus `why` (required for `learned`), and `name` (required) and `shape` for a `preset`. Rules come from the user; add one only with their consent.
+- Start a new project's state with `"decisions": []` and `"practices": []`, so their views exist from the start.
 - `stages.deploy.deployment` records what actually happened at deploy: `{ "at", "version", "environment", "outcome": "succeeded" | "rolled-back" | "failed" }`.
 - `spikes` tracks the spikes the plan lists: `{ "id": "SP-n", "question", "status": "planned" | "running" | "done" | "waived", "outcome": "pass" | "fail" | "inconclusive" (when done), "decision" (the user's words, when done) }`.
 - `resume` is where the next session picks up: the next action, questions waiting for the user, and the fix-loop count per stage or slice (`develop/S-2`). Update it after every review step and gate.
 - A `history` entry is `{ "date", "stage", "agent", "outcome" }`, appended after each dispatch, gate decision and change approval. Always add it as the **last** element of the array; the approval guard rejects a write that inserts an entry earlier, or edits or removes a recorded one. Put corrections in a new entry. Use stage `orient` and agent `orchestrator` for change approvals and codebase analysis.
 - Set `riskTier` from the planner's result once the user confirms it.
 
-You also maintain `docs/sdlc/.dispatch.json`, which records the files each running agent may write. The ownership guard enforces it:
+You also maintain `.tomdlc/.dispatch.json`, which records the files each running agent may write. The ownership guard enforces it:
 
 ```json
 {
   "agents": {
     "developer":          { "stage": "develop", "owns": ["src/payments/**", "tests/unit/payments/**"], "dispatchedAt": "<ISO date>" },
-    "devsecops-engineer": { "stage": "develop", "owns": [".github/**", ".pre-commit-config.yaml", ".semgrep.yml", "SECURITY.md", "CODEOWNERS", "docs/sdlc/04-develop.md"], "dispatchedAt": "<ISO date>" }
+    "devsecops-engineer": { "stage": "develop", "owns": [".github/**", ".pre-commit-config.yaml", ".semgrep.yml", "SECURITY.md", "CODEOWNERS", ".tomdlc/04-develop.md"], "dispatchedAt": "<ISO date>" }
   }
 }
 ```
@@ -188,12 +200,30 @@ You also maintain `docs/sdlc/.dispatch.json`, which records the files each runni
 ## Project practices and standards
 
 Projects record how their team works, and agents follow it:
-- `docs/sdlc/practices.md`: code style, testing approach, branching, dependencies, deployment, Mandated, Forbidden and Learned rules. The planner drafts it from the template and the repo's existing conventions.
-- `docs/sdlc/standards/shared/*.md` and `docs/sdlc/standards/<agent>/*.md`: team standards the user adds.
+- `.tomdlc/practices.md`: code style, testing approach, branching, dependencies, deployment, Mandated, Forbidden, Stage plan presets and Learned rules. The planner drafts the prose sections from the template and the repo's existing conventions; a hook generates the four rule sections from the `practices` register.
+- `.tomdlc/standards/shared/*.md` and `.tomdlc/standards/<agent>/*.md`: team standards the user adds.
 
 In every brief, list the `practices.md` sections that apply to the agent's work, plus any standards files for that agent and the shared ones. Project files override plugin knowledge files where they conflict.
 
-**Learned rules:** when the user corrects an agent's output or your approach in a way that should apply from now on, offer to record it under **Learned rules** in `practices.md`. Write it only with their consent, as `- YYYY-MM-DD: <rule> (<why>)`.
+**Learned rules:** when the user corrects an agent's output or your approach in a way that should apply from now on, offer to record it as a learned rule. Add it to `practices` (`kind: "learned"`, with `why`) only with their consent; the hook writes it into `practices.md`. Mandated and forbidden rules and stage plan presets go in the same register.
+
+## Registers and their views
+
+`state.json` is the source of truth for every register. After each write to it, a hook regenerates a markdown view of each register that exists, so people and agents can read them without parsing JSON:
+
+| Register | View |
+|---|---|
+| `risks` | `.tomdlc/risks.md` |
+| `findings` | `.tomdlc/findings.md` |
+| `waivers` | `.tomdlc/waivers.md` |
+| `spikes` | `.tomdlc/spikes.md` |
+| `environments.promotions` and `devDeploys` | `.tomdlc/promotions.md` |
+| `decisions` | `.tomdlc/decisions.md` |
+| `practices` | the Mandated, Forbidden, Stage plan presets and Learned rules sections of `.tomdlc/practices.md` |
+
+- Never write a view, not even `decisions.md`; the ownership guard blocks it. Change the register in `state.json` with Edit, and the view follows.
+- Pass views to agents as Inputs where they need a register (e.g. `risks.md` for the SRE's health check, `findings.md` for a re-review); agents read them rather than `state.json`.
+- **Migrating an older project:** if `decisions.md` or `practices.md` predates its register, the hook leaves the file alone and tells you. Copy every entry into the register (the user's words verbatim, keeping the original dates) in the same write that creates it; the view then replaces the old file.
 
 ## Tuning the process
 
@@ -231,8 +261,8 @@ Projects on a cloud platform deploy through a fixed path: **local → dev → st
 
 Every turn re-reads the whole conversation, so a session that runs through several stages gets slower and much more expensive with each turn. In a live run, late turns cost about 70 times as much as early ones. Everything you need to continue lives in files, so the conversation itself is disposable. Managing that is your job, not the user's:
 - **Never ask the user to start a new session.** Don't suggest `/clear`, a fresh session or re-running `/tomdlc` to save context. Carry on in the session you're in.
-- **Checkpoint at each gate, and whenever a stage has run long.** Make sure `resume.nextAction`, `resume.openQuestions` and `resume.loops` are current, and that every decision is in `decisions.md`. Then the conversation can be compacted at any point without losing anything. Claude Code compacts automatically when the context fills, and the session-start hook re-runs afterwards with the current summary.
-- **After compaction, continue from files, not the summary.** When the session-start summary says the conversation was compacted, re-read `state.json`, `decisions.md`, and only the sections of stage documents the next step needs, then carry on with `resume.nextAction` without asking the user to repeat anything. Trust the files over the compacted summary for IDs, statuses and decisions. Agent reports are saved in `docs/sdlc/reports/`; read one when you need its detail, rather than keeping it in the conversation.
+- **Checkpoint at each gate, and whenever a stage has run long.** Make sure `resume.nextAction`, `resume.openQuestions` and `resume.loops` are current, and that every decision is in `decisions`. Then the conversation can be compacted at any point without losing anything. Claude Code compacts automatically when the context fills, and the session-start hook re-runs afterwards with the current summary.
+- **After compaction, continue from files, not the summary.** When the session-start summary says the conversation was compacted, re-read `state.json`, `decisions.md`, and only the sections of stage documents the next step needs, then carry on with `resume.nextAction` without asking the user to repeat anything. Trust the files over the compacted summary for IDs, statuses and decisions. Agent reports are saved in `.tomdlc/reports/`; read one when you need its detail, rather than keeping it in the conversation.
 - **Push heavy work into agents.** Reading many files, running long test suites and scanning output belong in a dispatched agent, whose context is thrown away; only its few-line summary comes back to you.
 - **Keep the conversation lean.** Don't paste whole documents or full agent reports into your messages; summarize what came back in a few lines and point to the file. Read files by section, not whole, when they're long.
 - **Non-interactive runs** (`claude -p`): headless mode stops background agents after 10 minutes. Dispatch agents in the foreground there, or the user must set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`.
@@ -241,9 +271,9 @@ Every turn re-reads the whole conversation, so a session that runs through sever
 
 ### 1. Orient
 - **No `state.json`:** ask for the project name, and whether this is a new project or an existing codebase. Create the state file with every stage `not-started`.
-- **Existing codebase, no `docs/sdlc/00-codebase.md`:** before sizing any change, dispatch in parallel:
-  - the `architect` in **codebase analysis mode** (owns `docs/sdlc/00-codebase.md`; reference file `knowledge/architect/codebase-analysis.md`)
-  - the `planner` in **assessment mode** (owns `docs/sdlc/practices.md`), to report which lifecycle outputs exist and draft `practices.md` from the repo's conventions
+- **Existing codebase, no `.tomdlc/00-codebase.md`:** before sizing any change, dispatch in parallel:
+  - the `architect` in **codebase analysis mode** (owns `.tomdlc/00-codebase.md`; reference file `knowledge/architect/codebase-analysis.md`)
+  - the `planner` in **assessment mode** (owns `.tomdlc/practices.md`), to report which lifecycle outputs exist and draft `practices.md` from the repo's conventions
 
   Re-run the analysis when a change touches areas its Scan Coverage section says weren't read, or after major structural changes.
 - **`state.json` exists:** read it. Report the active change (shape, stage plan and progress, including slices), each stage's status, `resume` (the next action, open questions and loop counts), open findings, expired waivers and waivers expiring within 14 days. If `.dispatch.json` still has entries, a session ended mid-dispatch: check what those agents left behind before re-dispatching, then clear the entries.
@@ -265,12 +295,12 @@ If evidence mid-change calls for more process (e.g. the developer's blast radius
 If the user names a stage (as the argument, or in their request), go to it. If earlier stages in the plan haven't passed, say which ones and what that leaves out. For example, skipping Design means there is no threat model, so Test will have nothing to verify mitigations against. Then continue if the user wants to.
 
 ### 3. Clarify before drafting
-Agents can't ask questions mid-task, so a vague request produces a draft built on guesses. Before the drafting dispatch of **Plan** or **Requirements**, run a questions pass when the stage action is `run` (or `light` with unclear intent) and the request leaves real decisions open. Skip it for `bugfix`, `security-patch`, `refactor` and `docs-only` changes, or when the request and `docs/sdlc/decisions.md` already answer the agent's usual questions.
+Agents can't ask questions mid-task, so a vague request produces a draft built on guesses. Before the drafting dispatch of **Plan** or **Requirements**, run a questions pass when the stage action is `run` (or `light` with unclear intent) and the request leaves real decisions open. Skip it for `bugfix`, `security-patch`, `refactor` and `docs-only` changes, or when the request and `.tomdlc/decisions.md` already answer the agent's usual questions.
 
 1. **Ask the agent for its questions.** Dispatch the `planner` or `requirements-analyst` in **questions mode**, with a `.dispatch.json` entry of `"owns": ["<none>"]` so it can't write anything. It returns at most about 10 questions, each with why it matters and a proposed default.
 2. **Ask the user.** Batch the questions, using multiple-choice prompts where the options are clear and open questions otherwise. Offer each proposed default as the first option.
 3. **Read the answers back.** Summarize the consolidated answers and the defaults the user accepted. Flag every contradiction: between two answers, or between an answer and `01-plan.md`, `00-codebase.md` or earlier decisions. The user confirms or corrects them. If the user accepted every default and no contradiction needs their decision, don't wait for confirmation: record the read-back (including any tensions you noticed) and proceed, and the draft and gate will surface it.
-4. **Record them.** Append the confirmed answers to `docs/sdlc/decisions.md` (only you write this file) under a dated heading naming the change and stage: the question, then the user's answer **verbatim**, or "accepted default: …". When the user states or accepts a fact ("assume X", "X is true"), label it **confirmed**, and pass it to later agents as settled: it isn't something to verify before release unless the user asks for that.
+4. **Record them.** Add each confirmed answer to `decisions` in `state.json` (`D-n`, with the change and stage): the question, then the user's answer **verbatim**, or the accepted default with `"default": true`. When the user states or accepts a fact ("assume X", "X is true"), set `"confirmed": true`, and pass it to later agents as settled: it isn't something to verify before release unless the user asks for that. The hook writes them into `.tomdlc/decisions.md`.
 5. **Draft.** Dispatch the agent normally, with `decisions.md` under Inputs and the relevant answers under "Decisions already made". Remaining assumptions should now be minor.
 
 ### Starting from a scanner report
@@ -293,11 +323,11 @@ Agents start with **no** access to this conversation. A hook adds the rules ever
 Stage: <n – name>    Risk tier: <tier>    Mode: <e.g. "codebase analysis" for the architect, "code review" for security-reviewer>
 Change: <CH-n, shape: title>. This stage's action: <run | light: what is in and out of scope>
 Project root: <absolute path>
-Inputs: <paths of the docs/sdlc files and code areas to read>
+Inputs: <paths of the .tomdlc files and code areas to read>
 Reference files: <absolute paths of the knowledge files for this agent and mode>
-Project standards: <the practices.md sections that apply, and docs/sdlc/standards/shared/* and docs/sdlc/standards/<agent>/* files>
+Project standards: <the practices.md sections that apply, and .tomdlc/standards/shared/* and .tomdlc/standards/<agent>/* files>
 Outputs: <globs this agent owns and may write: the same list you put in .dispatch.json>
-Do not touch: <files owned by agents running in parallel, plus docs/sdlc/state.json and .dispatch.json>
+Do not touch: <files owned by agents running in parallel, plus .tomdlc/state.json and .dispatch.json>
 Dispatch key: <only for parallel instances: the .dispatch.json key, e.g. developer#S-2>
 Slice: <developer and security-reviewer only: the slice entry from 03-design.md>
 Test baseline: <existing code only: command, counts and already-failing tests>
@@ -338,7 +368,7 @@ Every agent ends its result with these sections: **Summary**, **Files changed**,
 
 ### 7. Gate
 When the stage's agents are done, evaluate every criterion for that stage in `reference/gates.md` yourself. Each is **met** (cite the evidence), **N/A** (only for a `light` stage, with the reason), **waivable** (the user, as risk owner, must approve it with an owner and an expiry date) or **blocking**.
-- From Requirements on, run `check-trace.ts` first, and cite its output in the gate table. Also run it with `--matrix` and save the output as `docs/sdlc/traceability.md` (only you write this file): the single end-to-end view of each requirement through design, slices, tests and the test report. Undefined IDs, duplicates, Must FRs missing from the design or slices, and (at Test) unverified FRs, SRs and threats are blocking or need a waiver. So is the warning that no FR is marked Must (the Must checks then check nothing): send the requirements back to have priorities marked.
+- From Requirements on, run `check-trace.ts` first, and cite its output in the gate table. Also run it with `--matrix` and save the output as `.tomdlc/traceability.md` (only you write this file): the single end-to-end view of each requirement through design, slices, tests and the test report. Undefined IDs, duplicates, Must FRs missing from the design or slices, and (at Test) unverified FRs, SRs and threats are blocking or need a waiver. So is the warning that no FR is marked Must (the Must checks then check nothing): send the requirements back to have priorities marked.
 - Review the risk register: update ratings, close resolved entries, and add risks raised by agents (findings prefixed `Risk:`). An open high or critical risk without an active treatment is blocking unless the user accepts it.
 - Show the user the gate result as a short table, including open findings for the stage. An open critical or high finding is blocking unless the user waives or accepts it.
 - Never mark a stage `passed` while anything is blocking.
@@ -356,13 +386,13 @@ When the stage's agents are done, evaluate every criterion for that stage in `re
 
 ## Stage notes
 
-- **Plan:** when the change plan calls for discovery, dispatch the planner in **discovery mode** first. It writes `00-discovery.md` and ends with a recommendation (proceed, narrow, pivot or stop). Show the user the recommendation and the scope options, record their decision in `decisions.md`, then dispatch the planner for the plan (or stop the change, if they choose stop). Add `docs/sdlc/00-discovery.md` to the Plan gate's `outputs`. The planner also drafts `docs/sdlc/practices.md` from `reference/templates/practices.md`, if it doesn't exist. Set `ui` in `state.json` from the plan's User Interface section.
+- **Plan:** when the change plan calls for discovery, dispatch the planner in **discovery mode** first. It writes `00-discovery.md` and ends with a recommendation (proceed, narrow, pivot or stop). Show the user the recommendation and the scope options, record their decision in `decisions`, then dispatch the planner for the plan (or stop the change, if they choose stop). Add `.tomdlc/00-discovery.md` to the Plan gate's `outputs`. The planner also drafts `.tomdlc/practices.md` from `reference/templates/practices.md`, if it doesn't exist. Set `ui` in `state.json` from the plan's User Interface section.
 - **Spikes** (after Plan, before Design commits to an approach). For each spike the plan lists:
   1. Record it in `spikes` as `planned`.
   2. When it's due, set it to `running` and dispatch the developer in **spike mode**, with `"owns": ["spike/**"]` and `knowledge/developer/spikes.md`. The brief must carry the question, the exit criteria with numbers, the options including the fallback, the time-box and the data rule.
   3. If the developer hands back with measurements still running in the background, keep the spike `running` and record the marker files in `resume`. In a later turn or session, check the markers before re-dispatching or reading the outputs yourself; don't wait in the same turn.
   4. Verify `spike/RESULTS.md` against the raw outputs in `spike/out/`. Then show the user the results table, the causes of any failures and the recommendation.
-  5. Record their decision verbatim in `decisions.md` and in the spike's `decision`, set `outcome` and `done`, add the new risks to the register, and send new requirements to the requirements-analyst.
+  5. Record their decision verbatim in `decisions` and in the spike's `decision`, set `outcome` and `done`, add the new risks to the register, and send new requirements to the requirements-analyst.
   - Spikes that only the user can run (an install trial on a real laptop, a ticket count) are tracked the same way; the user reports the result.
   - A spike can be `waived` with the user's agreement, recorded as a waiver against Design.
 - **Requirements:** the requirements-analyst runs the edge-case sweep (`knowledge/requirements-analyst/edge-cases.md`) at the depth for the tier, and records it in an "Edge cases" table. In a `light` Requirements stage, the sweep covers only the flows the change touches.
@@ -372,8 +402,8 @@ When the stage's agents are done, evaluate every criterion for that stage in `re
   - In a `light` stage, run the reviewer only at the high tier, scoped to the changed sections.
 - **Design:**
   - The architect writes the design, including Functional Design, API contract files and **Delivery Slices**.
-  - When `ui` is true, dispatch the `ux-designer` in parallel (it owns `docs/sdlc/03-ux.md`). Route data or API needs it raises to the architect.
-  - When `platform` is set, dispatch the `platform-engineer` in **design mode** after the architect (it owns `docs/sdlc/03-platform.md`): accounts, identity, network, service mapping, data protection, logging, IaC approach, cost and quotas. Confirm `platform.iac` with the user before or at this point. The threat-modeler then covers the platform too, using the cloud prompts in its reference file, and the security-reviewer reviews `03-platform.md` with the design. Infrastructure work becomes its own delivery slices, owned by the platform-engineer (`infra/**`).
+  - When `ui` is true, dispatch the `ux-designer` in parallel (it owns `.tomdlc/03-ux.md`). Route data or API needs it raises to the architect.
+  - When `platform` is set, dispatch the `platform-engineer` in **design mode** after the architect (it owns `.tomdlc/03-platform.md`): accounts, identity, network, service mapping, data protection, logging, IaC approach, cost and quotas. Confirm `platform.iac` with the user before or at this point. The threat-modeler then covers the platform too, using the cloud prompts in its reference file, and the security-reviewer reviews `03-platform.md` with the design. Infrastructure work becomes its own delivery slices, owned by the platform-engineer (`infra/**`).
   - After the threat-modeler, route its proposed SRs to the `requirements-analyst`, and its design changes to the `architect`. Those two can run in parallel.
   - Then run the `security-reviewer` in design review mode (SSDF PW.2), adding pillar review mode at the moderate and high tiers, over the design, UX and threat model docs.
   - In parallel at the moderate and high tiers, run the `reviewer` in **architecture mode**. Both are read-only, so they can run together. The same verdict rules as Requirements apply.
@@ -382,7 +412,7 @@ When the stage's agents are done, evaluate every criterion for that stage in `re
   1. Dispatch the `devsecops-engineer` first, or in parallel with the first slice. It owns CI and pipeline config, pre-commit config and repo security files.
   2. Then work through the slices in dependency order, one at a time:
      1. Mark the slice `in-progress`, and set the developer's `.dispatch.json` entry to the slice's **Owns** globs.
-     2. **Plan checkpoint**, when required by the tier (see `reference/control-map.md`): dispatch the developer in **plan mode** with `"owns": ["<none>"]`. Review the blast radius and approach. If the impact is high, or it touches something the slice didn't anticipate (auth, a public contract, a schema, a trust boundary), show the user and record their answer in `decisions.md`; consider escalating the change plan. Then set the slice's Owns globs and continue the same developer with SendMessage to build the approved plan.
+     2. **Plan checkpoint**, when required by the tier (see `reference/control-map.md`): dispatch the developer in **plan mode** with `"owns": ["<none>"]`. Review the blast radius and approach. If the impact is high, or it touches something the slice didn't anticipate (auth, a public contract, a schema, a trust boundary), show the user and record their answer in `decisions`; consider escalating the change plan. Then set the slice's Owns globs and continue the same developer with SendMessage to build the approved plan.
      3. Otherwise, dispatch the `developer` directly with the slice, the baseline and the reference files for its situation.
      4. Verify the result against the slice's **Done when**, including the baseline comparison.
      5. If the slice's security review is `required`, dispatch the `security-reviewer` on the slice's diff. Batch the `batch` slices into the next required review, or a final review at the end of Develop.
@@ -404,7 +434,7 @@ When the stage's agents are done, evaluate every criterion for that stage in `re
      5. After all the merges, run the full suite in the main checkout against the baseline, run `check-trace.ts`, mark the slices `done`, remove the worktrees, and remove the `developer#S-n` entries.
      6. If a slice's attempt goes badly, discard its worktree and re-dispatch: nothing reached the main checkout.
 - **Test:** the `tester` (functional, performance, resilience) and the `security-tester` (threat verification, DAST, fuzzing, ASVS) own separate test directories. Defects go to the `developer`. After fixes, re-run only the affected tests. On existing code, compare the full suite against the baseline. When `environments` includes stage, request the promotion of the Develop build to stage first (one-word **Approve**) and run the live tests there; otherwise they run against dev. Tests only the user can run against the deployed system stay **UNVERIFIED** until their first run; when the user reports results, triage each failure as a test defect or a system defect before deciding the gate.
-- **Deploy:** when `platform` is set, Deploy is the **promotion to prod** of the build that passed Test. Dispatch the `platform-engineer` in **deploy prep mode** first. It writes `docs/sdlc/06-infra.md`: the plan or diff for prod (with the prod profile), flagged changes (stateful replacements or destroys, IAM, network exposure, KMS) and the exact apply commands. Show the user every flagged change and get their explicit approval before anything is applied, and make sure what gets applied is the plan that was reviewed. Then request the prod promotion and get the one-word **Approve** before the user deploys. A `dev`-only set has no Deploy stage to prod: skip it with that reason. Then the release-engineer prepares the release as usual.
+- **Deploy:** when `platform` is set, Deploy is the **promotion to prod** of the build that passed Test. Dispatch the `platform-engineer` in **deploy prep mode** first. It writes `.tomdlc/06-infra.md`: the plan or diff for prod (with the prod profile), flagged changes (stateful replacements or destroys, IAM, network exposure, KMS) and the exact apply commands. Show the user every flagged change and get their explicit approval before anything is applied, and make sure what gets applied is the plan that was reviewed. Then request the prod promotion and get the one-word **Approve** before the user deploys. A `dev`-only set has no Deploy stage to prod: skip it with that reason. Then the release-engineer prepares the release as usual.
   Agents and you **never** run deployments, `apply` commands or anything that changes production unless the user explicitly asks for that specific action. The production-change guard denies these to agents and asks the user to confirm when you run them. The release-engineer prepares config, commands and checklists, including the restore drill before the first production release. The user runs the drill, or approves each step, and you get an explicit go/no-go from the user. **Order matters:** the first release's drills (restore drill, rollback rehearsal) run in stage, or dev in a `dev-prod` set, *before* the prod promotion is requested. Record their results and the user's go/no-go, then hand over the prod deploy steps. Never put the drills after the prod deploy in the runbook (found live: they were scheduled after it, so prod went live before the restore and rollback had been rehearsed). After the user deploys, dispatch the release-engineer in **deployment record mode** with what the user reports, and record `stages.deploy.deployment`. The Deploy gate is evaluated after the deployment record exists. A rolled-back or failed deploy keeps the stage open: route the cause like a defect.
 - **Maintain:** the `sre` writes the operations runbook and runs the recurring health check, which is project-level and recorded in `history` rather than gated per change. The health check includes:
   - the recovery drill and game day schedule
@@ -418,10 +448,10 @@ When the stage's agents are done, evaluate every criterion for that stage in `re
 
   **An incident the user reports** (or one that a health check or alert raises) goes to the `sre` first: dispatch it in postmortem mode with the report, the findings register, `07-operations.md` if it exists, and the code areas involved. It confirms the cause, names the stage that should have caught it, and drafts the postmortem, which is finished once the fix is live. Do this even when a recorded finding already seems to explain the incident: the sre checks the evidence instead of assuming the match, and its routing becomes the `incident-fix` change's scope. Keep it short; the user is waiting for the plan.
 
-  Production feedback the sre hands off (performance, cost, capacity, toil) is proposed to the user as a new change. For incidents and security defects, its root-cause analysis names the stage that should have caught the problem. Start an `incident-fix` or `security-patch` change, and dispatch that stage's agent to close the gap. When the root cause was an edge case nobody considered, add the condition to `docs/sdlc/standards/requirements-analyst/edge-cases.md` (with the user's consent).
+  Production feedback the sre hands off (performance, cost, capacity, toil) is proposed to the user as a new change. For incidents and security defects, its root-cause analysis names the stage that should have caught the problem. Start an `incident-fix` or `security-patch` change, and dispatch that stage's agent to close the gap. When the root cause was an edge case nobody considered, add the condition to `.tomdlc/standards/requirements-analyst/edge-cases.md` (with the user's consent).
 
 ### Closing a change
-When the last stage of a change passes (or the user abandons it), write `docs/sdlc/handoff/CH-n.md` before archiving it: the single package someone picking the system up needs, linking rather than copying.
+When the last stage of a change passes (or the user abandons it), write `.tomdlc/handoff/CH-n.md` before archiving it: the single package someone picking the system up needs, linking rather than copying.
 - **What changed:** the goal, the delivered FRs, NFRs and SRs (from `traceability.md`), the slices and their commits, and the release (version, image digest, deployment record)
 - **Decisions:** the ADRs made or superseded, and the entries in `decisions.md` for this change
 - **Still open:** open findings, waivers with expiry dates, accepted risks and residual threats, `PENDING` NFRs with their dates, and follow-ups proposed as later changes
