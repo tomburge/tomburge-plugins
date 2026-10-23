@@ -67,6 +67,9 @@ const ctx: string = (await run("on-session-start.ts", { cwd: P })).hookSpecificO
 for (const frag of ["Next action: Fix F-1 in S-1, then re-review", `Questions waiting for the user: "Which roles may export?"`,
   "Fix loops used (max 3): develop/S-1=2, design=1.", "Open findings: 1 high (F-1).", ".dispatch.json still lists developer"])
   expect(`session start: ${frag}`, ctx.includes(frag), true)
+expect("session start without compaction has no compaction note", ctx.includes("was just compacted"), false)
+const compacted: string = (await run("on-session-start.ts", { cwd: P, source: "compact" })).hookSpecificOutput?.additionalContext ?? ""
+expect("after compaction: re-orient from files, no new session", compacted.startsWith("TomDLC: the conversation was just compacted") && compacted.includes("without asking the user to start a new session") && compacted.includes("Next action: Fix F-1 in S-1, then re-review"), true)
 
 // ---- ownership guard: shell writes
 const AG = { agent_id: "a1", agent_type: "tomdlc:developer", cwd: P }

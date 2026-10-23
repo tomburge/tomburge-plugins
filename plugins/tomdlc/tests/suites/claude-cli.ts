@@ -10,6 +10,10 @@ const block = [...extraBlock,
   "echo $(claude -p hi)", "echo \"$(claude -p hi)\"", "echo `claude -p hi`", "Start-Process claude -ArgumentList '-p','hi'",
   "npx @anthropic-ai/claude-code -p hi", "bunx @anthropic-ai/claude-code", "pnpm dlx @anthropic-ai/claude-code",
   "npm exec @anthropic-ai/claude-code", "node ./node_modules/@anthropic-ai/claude-code/cli.js -p hi", "(claude -p x)",
+  // GitHub Copilot CLI
+  "copilot", "copilot -p 'do x' --allow-all-tools", "gh copilot", "gh copilot -p hi", "& copilot -p x", "Start-Process copilot",
+  "bash -c 'copilot -p hi'", "pwsh -Command \"copilot -p hi\"", "npx @github/copilot -p hi", "npm exec @github/copilot",
+  String.raw`& "C:\Program Files\Microsoft VS Code\bin\copilot-shim\copilot.cmd" -p x`,
 ]
 const allow = [
   "grep -rn claude .", "echo claude", "echo 'claude -p hi'", "git commit -m 'teach claude; fix claude | stuff'",
@@ -17,6 +21,8 @@ const allow = [
   "cat ~/.claude/settings.json", "ls .claude-plugin", "claude-code-helper --x", "npm install -g @anthropic-ai/claude-code",
   "bun hooks-handlers/block-claude-cli.ts", "Get-Content $HOME\.claude\settings.json", "echo \"Claude says hi\"",
   "rg 'claude' --type ts", "git log --grep claude",
+  "grep -rn copilot .", "echo copilot", "gh pr create --title 'copilot port'", "gh api repos/x/y", "npm install -g @github/copilot",
+  "cat .github/copilot-instructions.md", "git commit -m 'copilot: fix hooks'",
 ]
 let fail = 0
 async function run(cmd: string) {

@@ -160,7 +160,22 @@ expect("scan skips docs/sdlc", await ps("docs/sdlc/state.json", PATHX), {})
   expect("working guard runs unchanged (deny)", decision(await fc("block-claude-cli.ts", { ...ev, tool_input: { command: "claude -p x" } })), "deny")
   const hooksJson = await Bun.file(join(H, "..", "hooks", "hooks.json")).text()
   expect("every PreToolUse guard goes through fail-closed.ts",
-    ["block-claude-cli", "prod-guard", "ownership-guard", "secrets-guard", "approval-guard", "web-guard"].every((g) => hooksJson.includes(`fail-closed.ts\\" ${g}.ts`)), true)
+    ["block-claude-cli", "prod-guard", "ownership-guard", "secrets-guard", "approval-guard", "web-guard", "dispatch-guard"].every((g) => hooksJson.includes(`fail-closed.ts\\" ${g}.ts`)), true)
+}
+
+// ---- agent-rules: the shared rules reach every TomDLC agent, and only there
+{
+  const { readFileSync, readdirSync } = await import("node:fs")
+  const rules = readFileSync(join(H, "..", "skills/orchestrator/reference/agent-rules.md"), "utf8")
+  const ctx = async (ev: object) => (await run("agent-rules.ts", { hook_event_name: "SubagentStart", ...ev })).hookSpecificOutput?.additionalContext
+  expect("agent-rules: TomDLC agent gets the shared rules", await ctx(AG), rules)
+  expect("agent-rules: other agents get nothing", await ctx({ agent_id: "x", agent_type: "Explore", cwd: P }), undefined)
+  const shared = "Commands you hand the user must never sign them out"
+  const repeats = readdirSync(join(H, "..", "agents")).filter((f) => readFileSync(join(H, "..", "agents", f), "utf8").includes(shared))
+  expect("agent prompts don't repeat the shared rules", repeats, [])
+  const sections = [...rules.matchAll(/^### (.+)$/gm)].map((m) => m[1].trim())
+  const checked = readFileSync(join(H, "agent-report-check.ts"), "utf8").match(/const SECTIONS = (\[.*\])/)?.[1]
+  expect("agent-rules result sections match agent-report-check", JSON.stringify(sections), checked?.replaceAll('", "', '","'))
 }
 
 console.log(`${total} checks, ${fails} failures`)

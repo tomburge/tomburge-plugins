@@ -6,6 +6,7 @@ Reference material that agents read during their work. Each agent's prompt stays
 - Files are grouped by agent (`knowledge/<agent>/*.md`), plus `knowledge/shared/*.md` for topics several agents need.
 - The orchestrator lists the relevant files as **absolute paths** under **Reference files** in each brief. Agents read them with the Read tool.
 - Pass only what the brief's mode and change need, using the table below.
+- Always add `shared/engineering-principles.md` (YAGNI, DRY, surgical changes, verified goals) for the agents that design or build: the architect, ux-designer, platform-engineer, developer (except in spike mode), devsecops-engineer, tester, security-tester, release-engineer and sre. Also pass it to the reviewer in code mode.
 
 ## Which files to pass
 

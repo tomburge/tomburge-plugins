@@ -57,5 +57,5 @@ Every run turned up fixes that were committed afterwards; the commit log has the
 3. **Still untested live, lower value:** the `dev`-only set, warm-standby and active-active DR, CDK in Python, medium and large scale, spikes and discovery mode. The suites cover their rules.
 
 ## Open questions about the plugin
-- **Session cost.** One long session gets expensive: late turns cost far more than early ones, so the orchestrator suggests a fresh session at each gate. If runs still overspend, look at what each stage's brief passes in.
+- **Session cost.** One long session gets expensive: late turns cost far more than early ones, so the orchestrator checkpoints `resume` at each gate, pushes heavy work into agents and relies on compaction (the session-start hook re-orients it afterwards) instead of asking the user for a new session. If runs still overspend, look at what each stage's brief passes in.
 - **Review convergence.** Rework passes at the high tier tended to produce one more medium per re-check. The convergence rules in `tuning.md` should stop that; confirm in the next high-tier run.

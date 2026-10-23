@@ -26,7 +26,8 @@ The plugin's hooks enforce these boundaries, so expect agents to report blocked 
 
 | Hook | Applies to | Effect |
 |---|---|---|
-| Claude CLI block | everyone | Blocks launching `claude` from a shell |
+| Agent CLI block | everyone | Blocks launching `claude`, `copilot` or `gh copilot` from a shell |
+| Dispatch guard | you | Denies dispatching a TomDLC agent by its bare name; use `tomdlc:<agent>` |
 | Production-change guard | agents: denied; you: the user is asked to confirm | Blocks commands like `terraform apply`, `kubectl apply`, `helm upgrade`, cloud CLI changes, `git push`, publishing Deploys aimed at stage or prod (by profile or env-named var file) are denied for everyone until that promotion is approved with "Approve". |
 | Ownership guard | agents; you for shell writes to state | Blocks agents' writes to `state.json` and `.dispatch.json`, and writes outside the agent's `owns` globs. Blocks your shell writes to `state.json` and `.dispatch.json`: use Write or Edit, so the checks run |
 | Report check | TomDLC agents | Sends an agent back once if its result is missing a required section |
@@ -228,9 +229,11 @@ Projects on a cloud platform deploy through a fixed path: **local → dev → st
 
 ## Session hygiene
 
-Every turn re-reads the whole conversation, so a session that runs through several stages gets slower and much more expensive with each turn. In a live run, late turns cost about 70 times as much as early ones. Everything you need to continue lives in files, so keep sessions short:
-- **Suggest a fresh session at each gate.** After a stage passes, make sure `resume.nextAction` and `resume.openQuestions` are current. Then tell the user that the next stage can start in a new session with `/tomdlc`; the session-start summary and `state.json` carry everything over. Suggest it again whenever a single stage has run long.
-- **Continue from files, not memory.** In a new session, read `state.json`, the session-start summary, `decisions.md`, and only the sections of stage documents the next step needs. Agent reports are saved in `docs/sdlc/reports/`; read one when you need its detail, rather than keeping it in the conversation.
+Every turn re-reads the whole conversation, so a session that runs through several stages gets slower and much more expensive with each turn. In a live run, late turns cost about 70 times as much as early ones. Everything you need to continue lives in files, so the conversation itself is disposable. Managing that is your job, not the user's:
+- **Never ask the user to start a new session.** Don't suggest `/clear`, a fresh session or re-running `/tomdlc` to save context. Carry on in the session you're in.
+- **Checkpoint at each gate, and whenever a stage has run long.** Make sure `resume.nextAction`, `resume.openQuestions` and `resume.loops` are current, and that every decision is in `decisions.md`. Then the conversation can be compacted at any point without losing anything. Claude Code compacts automatically when the context fills, and the session-start hook re-runs afterwards with the current summary.
+- **After compaction, continue from files, not the summary.** When the session-start summary says the conversation was compacted, re-read `state.json`, `decisions.md`, and only the sections of stage documents the next step needs, then carry on with `resume.nextAction` without asking the user to repeat anything. Trust the files over the compacted summary for IDs, statuses and decisions. Agent reports are saved in `docs/sdlc/reports/`; read one when you need its detail, rather than keeping it in the conversation.
+- **Push heavy work into agents.** Reading many files, running long test suites and scanning output belong in a dispatched agent, whose context is thrown away; only its few-line summary comes back to you.
 - **Keep the conversation lean.** Don't paste whole documents or full agent reports into your messages; summarize what came back in a few lines and point to the file. Read files by section, not whole, when they're long.
 - **Non-interactive runs** (`claude -p`): headless mode stops background agents after 10 minutes. Dispatch agents in the foreground there, or the user must set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`.
 
@@ -284,7 +287,7 @@ Before the first Develop dispatch of each change on an existing codebase:
 3. If there are no tests, record zero counts. That's weak verification: apply the escalation rule, and brief the developer to write characterization tests before changing behavior.
 
 ### 5. Brief and dispatch
-Agents start with **no** access to this conversation. Every brief must be self-contained:
+Agents start with **no** access to this conversation. A hook adds the rules every agent shares (`reference/agent-rules.md`: working rules, file writing, web research and the result sections), so don't repeat them in briefs. Every brief must be self-contained:
 
 ```
 Stage: <n – name>    Risk tier: <tier>    Mode: <e.g. "codebase analysis" for the architect, "code review" for security-reviewer>
@@ -314,6 +317,7 @@ Leave out lines that don't apply. **Never state the verdict you expect** in a br
 **Which reference files:** use the table in `reference/knowledge/README.md`. The table is per agent and mode; for example, the architect gets `codebase-analysis.md` only in codebase analysis mode.
 
 - **Before dispatching**, write each agent's entry to `.dispatch.json`.
+- **Dispatch by the full name,** `tomdlc:<agent>` (e.g. `tomdlc:reviewer`). A bare name can pick a project or user agent with the same name instead.
 - **Parallel agents:** when they're independent, create them in one message. Give each a disjoint set of files it owns. If two agents must touch the same file, run them sequentially. Two instances of the same agent can run at once only as parallel slices (see the Develop notes), each with its own `<name>#<suffix>` key and `Dispatch key:` line.
 - **Sequential agents:** when one needs another's output, wait for it, then put the relevant parts of its result in the next brief.
 - To give a running or finished agent extra information (e.g. the user's answers to its questions), continue it with SendMessage rather than starting over.

@@ -47,6 +47,15 @@
         ]
       },
       {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/fail-closed.ts\" dispatch-guard.ts"
+          }
+        ]
+      },
+      {
         "matcher": "WebFetch|WebSearch",
         "hooks": [
           {
@@ -102,6 +111,10 @@
     "SubagentStart": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/agent-rules.ts\""
+          },
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/audit-events.ts\""

@@ -30,8 +30,24 @@ export interface HookEvent {
   [key: string]: unknown
 }
 
+/** Copilot CLI's input fields for Write and Edit, and the Claude Code names the handlers read. */
+const COPILOT_FIELDS: Record<string, string> = { path: "file_path", file_text: "content", old_str: "old_string", new_str: "new_string" }
+
+/**
+ * GitHub Copilot CLI sends Claude's tool names (Write, Edit) with its own input
+ * fields: Write is {path, file_text} and Edit is {path, old_str, new_str}. Copy
+ * them to Claude's names so every guard reads one shape. Without this, the file
+ * guards see no path and no content, and let the write through.
+ */
+function normalizeInput(event: HookEvent): HookEvent {
+  const input = event.tool_input
+  if (!input || (event.tool_name !== "Write" && event.tool_name !== "Edit")) return event
+  for (const [from, to] of Object.entries(COPILOT_FIELDS)) if (input[to] === undefined && input[from] !== undefined) input[to] = input[from]
+  return event
+}
+
 export async function readEvent(): Promise<HookEvent> {
-  return JSON.parse(await new Response(Bun.stdin.stream()).text())
+  return normalizeInput(JSON.parse(await new Response(Bun.stdin.stream()).text()))
 }
 
 let responded = false

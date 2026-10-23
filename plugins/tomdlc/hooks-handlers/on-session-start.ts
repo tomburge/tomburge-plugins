@@ -10,7 +10,7 @@ import { appendAudit, drift, verifyAudit } from "./lib/audit.ts"
 
 const STAGES = ["plan", "requirements", "design", "develop", "test", "deploy", "maintain"]
 
-function context(cwd: string): string | null {
+function context(cwd: string, source?: string): string | null {
   const statePath = join(cwd, "docs", "sdlc", "state.json")
   if (!existsSync(statePath)) return null
 
@@ -24,6 +24,9 @@ function context(cwd: string): string | null {
   const change = state.change
   const slices: { id: string; status: string }[] = state.stages?.develop?.slices ?? []
   const lines = [
+    ...(source === "compact"
+      ? ["TomDLC: the conversation was just compacted. Before continuing, re-read docs/sdlc/state.json and decisions.md (and only the stage-document sections the next step needs); trust them over the compacted summary. Then carry on with the next action without asking the user to start a new session or repeat anything."]
+      : []),
     `TomDLC: project "${state.project ?? "unnamed"}" is in stage ${STAGES.indexOf(current) + 1}/7 (${current}).`,
     change ? `Active change: ${change.id} (${change.shape}): ${change.title}.` : "No active change recorded.",
     `Stage status: ${statuses}.`,
@@ -112,7 +115,7 @@ function context(cwd: string): string | null {
 const event = JSON.parse(await new Response(Bun.stdin.stream()).text())
 let additionalContext: string | null = null
 try {
-  additionalContext = context(event.cwd ?? process.cwd())
+  additionalContext = context(event.cwd ?? process.cwd(), event.source)
   if (additionalContext) appendAudit(event.cwd ?? process.cwd(), "session_started", "user", { source: event.source })
 } catch (err) {
   additionalContext = `TomDLC: docs/sdlc/state.json exists but could not be read (${err}). Offer to repair it with /tomdlc.`

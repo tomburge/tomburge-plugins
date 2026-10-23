@@ -61,5 +61,6 @@ Follow `../shared/observability.md`: structured logs at operation boundaries, co
 - [ ] No new global state; collaborators injected
 - [ ] Logs structured, with no secrets or personal data
 - [ ] Tests written as described in `unit-testing.md`
+- [ ] Nothing speculative, no duplicated knowledge, and no edits outside the slice (`../shared/engineering-principles.md`)
 
 Facts checked against primary sources on 2026-10-14.

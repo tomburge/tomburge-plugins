@@ -51,7 +51,7 @@ For a change to an existing project, set the change's scale from the change itse
 | Operations docs | One runbook file with a section per alert; the release record and operations doc at a page or two each | Per the SRE guide | Per the SRE guide, per area |
 | Waivers | One waiver per stage for the checks only the user can run (drills, email delivery, live probes), listing them; scanner suppressions grouped per rule | One per decision | One per decision |
 | Gate presentation | One line for the criteria that are met; list only unmet, waived and N/A criteria | Same | Same, grouped by area |
-| Sessions | A fresh session per stage | Per stage | Per stage, and per area or batch of slices |
+| Context checkpoints (`resume` and `decisions.md` current, so compaction loses nothing; never ask the user for a new session) | At each gate | At each gate | At each gate, and per area or batch of slices |
 
 ## Trimming Develop at the small scale
 Two small AWS projects at the low tier spent most of their budget in Develop (about $46 and $56): 580–670 tests, 9 alarms, custom CI gate scripts with hundreds of subtests, 9–17 waivers, and a review per slice. Requirements and design were right-sized; what Develop *built around* the code wasn't. The rows above set the small-scale budget for those outputs. The controls the tier requires stay: secrets scanning, SAST, IaC scanning, the security review on trust boundaries, and tests for every requirement and mitigation.
